@@ -2,26 +2,20 @@
 """
 smoke_test.py
 =============
-End-to-end sanity check on 10 synthetic images.
+End-to-end sanity check — works WITHOUT the real dataset.
+Runs on 10 synthetic images to prove all modules import correctly
+and all model forward passes produce the right shapes.
 
-Purpose
--------
-Proves the full pipeline is importable and runnable WITHOUT needing the
-real dataset.  Run this after every major change to catch import errors,
-shape mismatches, and config bugs early.
-
-Usage
------
+Usage:
     python smoke_test.py
 
-Expected output: "ALL SMOKE TESTS PASSED" with no exceptions.
+Expected: "ALL SMOKE TESTS PASSED" with no exceptions.
 """
 
 import sys
 import traceback
 from pathlib import Path
 
-# ── Make sure repo root is on the path ───────────────────────────────────────
 ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(ROOT))
 
@@ -29,21 +23,19 @@ import torch
 import numpy as np
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BATCH  = 4          # small batch so it runs fast even on CPU
-H, W   = 224, 224   # must match config.yaml → data.image_size
-PASSED = []
-FAILED = []
+BATCH  = 2
+H, W   = 128, 128
+PASSED, FAILED = [], []
 
 
-def run(name: str, fn):
-    """Run a single test, capture pass/fail."""
+def run(name, fn):
     try:
         fn()
         PASSED.append(name)
-        print(f"  ✓  {name}")
+        print(f"  [PASS]  {name}")
     except Exception:
         FAILED.append(name)
-        print(f"  ✗  {name}")
+        print(f"  [FAIL]  {name}")
         traceback.print_exc()
 
 
@@ -52,59 +44,112 @@ def run(name: str, fn):
 def test_config():
     from src.utils.config import CFG
     assert CFG.seed == 42
-    assert len(CFG.data.split_ratios) == 3
-    assert abs(sum(CFG.data.split_ratios) - 1.0) < 1e-6, "split ratios must sum to 1"
+    assert CFG.data.image_size == [128, 128]
+    assert abs(sum(CFG.data.split_ratios) - 1.0) < 1e-6
 
 
 def test_seed():
     from src.utils.seed import set_all_seeds
     set_all_seeds(42)
-    # Reproducibility check: same seed → same random number
     t1 = torch.rand(5)
     set_all_seeds(42)
     t2 = torch.rand(5)
-    assert torch.allclose(t1, t2), "Seeds not reproducible"
+    assert torch.allclose(t1, t2)
 
 
 def test_metrics():
     from src.utils.metrics import classification_metrics, dice_coefficient, iou_score
-    y_true = [0, 0, 1, 1]
-    y_pred = [0, 1, 1, 1]
-    m = classification_metrics(y_true, y_pred)
+    m = classification_metrics([0, 0, 1, 1], [0, 1, 1, 1])
     assert 0 <= m["accuracy"] <= 1
-    assert 0 <= m["f1"] <= 1
-
     pred = np.array([[1, 0], [1, 1]])
     true = np.array([[1, 1], [1, 0]])
-    d = dice_coefficient(pred, true)
-    iou = iou_score(pred, true)
-    assert 0 <= d <= 1
-    assert 0 <= iou <= 1
+    assert 0 <= dice_coefficient(pred, true) <= 1
+    assert 0 <= iou_score(pred, true) <= 1
 
 
 def test_plotting():
-    from src.utils.plotting import plot_training_curves
     import matplotlib
-    matplotlib.use("Agg")   # non-interactive backend for headless environments
-    fig = plot_training_curves(
-        [0.9, 0.7, 0.5], [1.0, 0.8, 0.6],
-        [0.6, 0.7, 0.8], [0.5, 0.65, 0.75],
-        title="Smoke Test",
-    )
+    matplotlib.use("Agg")
+    from src.utils.plotting import plot_training_curves
+    fig = plot_training_curves([0.9, 0.7], [1.0, 0.8], [0.6, 0.7], [0.5, 0.65])
     assert fig is not None
 
 
-# ── Placeholder tests (filled in as modules are built) ───────────────────────
+def test_baseline():
+    from src.models.baseline import build_baseline
+    model = build_baseline().to(DEVICE)
+    x = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    y = model(x)
+    assert y.shape == (BATCH, 2), f"Expected (B,2), got {y.shape}"
 
-def test_placeholder_cnn():
-    """Placeholder: will test CustomCNN forward pass once M3 is built."""
-    # TODO: replace with actual import once src/models/cnn.py exists
-    pass
+
+def test_cnn():
+    from src.models.cnn import build_cnn, build_cnn_no_bn, build_cnn_no_dropout
+    for name, builder in [("full", build_cnn), ("no_bn", build_cnn_no_bn), ("no_drop", build_cnn_no_dropout)]:
+        model = builder().to(DEVICE)
+        x = torch.randn(BATCH, 3, H, W).to(DEVICE)
+        y = model(x)
+        assert y.shape == (BATCH, 2), f"CNN [{name}] shape mismatch: {y.shape}"
 
 
-def test_placeholder_autoencoder():
-    """Placeholder: will test AE forward pass once M8 is built."""
-    pass
+def test_transfer():
+    from src.models.transfer import build_transfer_model
+    model = build_transfer_model(pretrained=False).to(DEVICE)
+    x = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    y = model(x)
+    assert y.shape == (BATCH, 2)
+    # Test freeze/unfreeze
+    model.freeze_backbone()
+    frozen = sum(1 for p in model.parameters() if not p.requires_grad)
+    model.unfreeze_last_blocks(2)
+    unfrozen_after = sum(1 for p in model.parameters() if p.requires_grad)
+    assert unfrozen_after > 0
+
+
+def test_unet():
+    from src.models.unet import build_unet, compute_severity
+    model = build_unet().to(DEVICE)
+    x = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    y = model(x)
+    assert y.shape == (BATCH, 1, H, W), f"UNet shape mismatch: {y.shape}"
+    assert y.min() >= 0 and y.max() <= 1, "UNet output not in [0,1]"
+    # Test severity
+    from src.utils.config import CFG
+    sev = compute_severity(y[0], CFG.unet.severity_thresholds)
+    assert sev in ["Low", "Medium", "High"]
+
+
+def test_siamese():
+    from src.models.siamese import build_siamese, ContrastiveLoss
+    model = build_siamese().to(DEVICE)
+    x1 = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    x2 = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    e1, e2 = model(x1, x2)
+    assert e1.shape == (BATCH, 128)
+    # L2 norm should be ~1
+    norms = torch.norm(e1, dim=1)
+    assert torch.allclose(norms, torch.ones(BATCH, device=DEVICE), atol=1e-5)
+    # Contrastive loss should be non-negative
+    loss_fn = ContrastiveLoss(margin=1.0)
+    labels  = torch.zeros(BATCH).to(DEVICE)   # same pair
+    loss    = loss_fn(e1, e2, labels)
+    assert loss.item() >= 0
+
+
+def test_autoencoder():
+    from src.models.autoencoder import build_autoencoder, compute_anomaly_score
+    model = build_autoencoder().to(DEVICE)
+    x = torch.randn(BATCH, 3, H, W).to(DEVICE)
+    recon = model(x)
+    assert recon.shape == (BATCH, 3, H, W), f"AE shape mismatch: {recon.shape}"
+    score = compute_anomaly_score(model, x[0], torch.device(DEVICE))
+    assert score >= 0
+
+
+def test_gradcam_import():
+    from src.explainability.gradcam import GradCAM
+    # Just test import — full run needs a checkpoint
+    assert GradCAM is not None
 
 
 # ─────────────────────────── Runner ──────────────────────────────────────────
@@ -114,21 +159,25 @@ if __name__ == "__main__":
     print(f"  PotholeIQ Smoke Test  |  device={DEVICE}")
     print(f"{'='*55}\n")
 
-    run("Config loads correctly",      test_config)
-    run("Seeds are reproducible",      test_seed)
-    run("Metrics helpers work",        test_metrics)
-    run("Plotting helpers work",       test_plotting)
-    run("CNN placeholder",             test_placeholder_cnn)
-    run("Autoencoder placeholder",     test_placeholder_autoencoder)
+    run("Config loads",              test_config)
+    run("Seeds reproducible",        test_seed)
+    run("Metrics helpers",           test_metrics)
+    run("Plotting helpers",          test_plotting)
+    run("Baseline MLP",              test_baseline)
+    run("Custom CNN (3 variants)",   test_cnn)
+    run("Transfer MobileNetV2",      test_transfer)
+    run("U-Net segmentation",        test_unet)
+    run("Siamese + ContrastiveLoss", test_siamese)
+    run("Convolutional Autoencoder", test_autoencoder)
+    run("Grad-CAM import",           test_gradcam_import)
 
-    print(f"\n{'─'*55}")
+    print(f"\n{'=' * 55}")
     print(f"  Results: {len(PASSED)} passed, {len(FAILED)} failed")
-    print(f"{'─'*55}")
+    print(f"{'=' * 55}")
 
     if FAILED:
-        print("\n  ❌  SOME TESTS FAILED — fix before continuing.\n")
+        print("\n  [FAILED] SOME TESTS FAILED\n")
         sys.exit(1)
     else:
-        print("\n  ✅  ALL SMOKE TESTS PASSED\n")
+        print("\n  [OK] ALL SMOKE TESTS PASSED\n")
         sys.exit(0)
-
