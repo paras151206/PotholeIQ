@@ -126,3 +126,4 @@ def plot_roc_curve(
         print(f"[plot] Saved → {save_path}")
 
     return fig
+

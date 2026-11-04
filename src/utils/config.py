@@ -53,3 +53,4 @@ def load_config(config_path: str | Path | None = None) -> SimpleNamespace:
 
 # Module-level singleton — import this everywhere.
 CFG = load_config()
+
