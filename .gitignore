@@ -1,0 +1,54 @@
+# ── Datasets & large binary files ──────────────────────────────────────────
+data/raw/
+data/processed/
+data/splits/*.csv   # generated at runtime; re-create with src/data/split.py
+*.zip
+*.tar.gz
+*.tar
+*.h5
+*.hdf5
+
+# ── Model weights (too large for git; upload to Drive/HuggingFace Hub) ──────
+results/checkpoints/*.pth
+results/checkpoints/*.pt
+*.ckpt
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+*.pyo
+
+# ── Virtual environments ─────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb~
+
+# ── OS artefacts ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Logs & caches ────────────────────────────────────────────────────────────
+*.log
+wandb/
+mlruns/
+.cache/

@@ -1,0 +1,104 @@
+# =============================================================================
+# PotholeIQ — Central Configuration
+# Every hyperparameter lives here. Code reads this file; nothing is hard-coded.
+# =============================================================================
+
+# ── Reproducibility ───────────────────────────────────────────────────────────
+seed: 42
+
+# ── Paths (relative to repo root) ────────────────────────────────────────────
+paths:
+  data_raw:        "data/raw"
+  data_processed:  "data/processed"
+  splits_dir:      "data/splits"
+  results_dir:     "results"
+  plots_dir:       "results/plots"
+  metrics_dir:     "results/metrics"
+  checkpoints_dir: "results/checkpoints"
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data:
+  image_size: [224, 224]      # (H, W) fed to all models
+  split_ratios: [0.70, 0.15, 0.15]   # train / val / test
+  num_workers: 2              # DataLoader workers (set 0 on Windows if errors)
+  pin_memory: true
+
+# ── Training (shared defaults) ────────────────────────────────────────────────
+train:
+  batch_size: 32
+  epochs: 30
+  early_stopping_patience: 7  # stop if val loss doesn't improve for N epochs
+
+# ── Baseline (Logistic Regression / tiny MLP) ─────────────────────────────────
+baseline:
+  hidden_dims: [256, 64]      # MLP hidden layer sizes; empty list → logistic reg
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 20
+
+# ── Custom CNN (M3) ───────────────────────────────────────────────────────────
+cnn:
+  channels: [32, 64, 128, 256]  # output channels of each conv block
+  dropout: 0.4
+  lr: 0.0003
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  scheduler: "cosine"           # "cosine" | "step" | "none"
+
+# ── Transfer Learning (M4) ───────────────────────────────────────────────────
+transfer:
+  backbone: "mobilenet_v2"      # "mobilenet_v2" | "resnet18"
+  phase1_epochs: 10             # frozen backbone
+  phase2_epochs: 20             # unfreeze last N blocks
+  unfreeze_blocks: 3
+  phase1_lr: 0.001
+  phase2_lr: 0.00005
+  dropout: 0.3
+
+# ── Segmentation U-Net (M5) ──────────────────────────────────────────────────
+unet:
+  encoder_channels: [3, 64, 128, 256]
+  dice_weight: 0.5              # combined loss = dice_w*Dice + (1-dice_w)*BCE
+  lr: 0.0001
+  epochs: 30
+  # Severity thresholds (mask_area / image_area)
+  severity_thresholds:
+    low_max: 0.05               # < 5 % → Low
+    medium_max: 0.20            # 5–20 % → Medium
+                                # > 20 % → High
+
+# ── Siamese Network (M7) ─────────────────────────────────────────────────────
+siamese:
+  embedding_dim: 128
+  margin: 1.0                   # contrastive loss margin
+  lr: 0.0003
+  epochs: 30
+
+# ── Autoencoder (M8) ─────────────────────────────────────────────────────────
+autoencoder:
+  latent_dim: 128
+  lr: 0.0003
+  epochs: 50
+  anomaly_threshold: null       # set after validation; null means auto-select
+
+# ── LSTM trend (M9 — optional) ───────────────────────────────────────────────
+lstm:
+  hidden_size: 64
+  num_layers: 2
+  lr: 0.001
+  epochs: 50
+  seq_len: 10                   # number of time-steps per sequence
+
+# ── Augmentation ─────────────────────────────────────────────────────────────
+augmentation:
+  horizontal_flip: true
+  vertical_flip: false
+  rotation_degrees: 15
+  color_jitter:
+    brightness: 0.3
+    contrast: 0.3
+    saturation: 0.2
+    hue: 0.05
+  random_erasing: true
+  normalize_mean: [0.485, 0.456, 0.406]  # ImageNet stats (also used for custom)
+  normalize_std:  [0.229, 0.224, 0.225]
