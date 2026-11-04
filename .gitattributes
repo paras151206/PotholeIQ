@@ -1,0 +1,11 @@
+# Normalise line endings to LF on commit, convert to OS native on checkout
+* text=auto eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.ipynb text eol=lf
+*.pth binary
+*.pt binary
+*.h5 binary
