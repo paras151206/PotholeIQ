@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/explainability/gradcam.py
 ==============================
 Manual Grad-CAM implementation — built from scratch so every step can be
@@ -10,7 +10,7 @@ Theory (Selvaraju et al., 2017):
   2. Run a backward pass for the target class score and record ∂y^c / ∂A^k.
   3. Global-average-pool the gradients over spatial dimensions to get a scalar
      weight α_k^c for each feature-map channel k.
-  4. Compute the weighted sum Σ_k α_k^c · A^k → raw heatmap (H_raw).
+  4. Compute the weighted sum Σ_k α_k^c · A^k -> raw heatmap (H_raw).
   5. Apply ReLU: only pixels where the class has a *positive* influence are kept.
   6. Normalise to [0, 1] for display.
 """
@@ -48,7 +48,7 @@ def denormalize(tensor: torch.Tensor, mean, std) -> np.ndarray:
     img = img * std + mean               # undo normalisation
     img = np.clip(img, 0.0, 1.0)
     img = (img * 255).astype(np.uint8)
-    img = np.transpose(img, (1, 2, 0))   # → (H, W, 3) RGB
+    img = np.transpose(img, (1, 2, 0))   # -> (H, W, 3) RGB
     return img
 
 
@@ -132,7 +132,7 @@ class GradCAM:
         score.backward()
         # self._gradients now holds ∂score / ∂A  (B, C, H, W) with B=1
 
-        # 3. Global-average-pool the gradients over spatial dims → weights
+        # 3. Global-average-pool the gradients over spatial dims -> weights
         #    α_k = (1/Z) Σ_{i,j} (∂y^c / ∂A^k_{ij})
         grads = self._gradients.squeeze(0)   # (C, H, W)
         weights = grads.mean(dim=(1, 2))     # (C,)
@@ -178,7 +178,7 @@ class GradCAM:
         # Resize heatmap to match input image resolution
         heatmap_resized = cv2.resize(heatmap, (W, H))  # (H, W) float
 
-        # Map [0,1] → [0,255] and apply jet colormap (OpenCV uses BGR)
+        # Map [0,1] -> [0,255] and apply jet colormap (OpenCV uses BGR)
         heatmap_uint8 = (heatmap_resized * 255).astype(np.uint8)
         heatmap_color_bgr = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
         heatmap_color_rgb = cv2.cvtColor(heatmap_color_bgr, cv2.COLOR_BGR2RGB)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/utils/metrics.py
 ---------------------
 Reusable metric helpers used across classifiers, segmentation, and
@@ -24,7 +24,7 @@ from sklearn.metrics import (
 )
 
 
-# ─────────────────────────── Classification ──────────────────────────────────
+# --------------------------- Classification ----------------------------------
 
 def classification_metrics(
     y_true: Sequence[int],
@@ -74,7 +74,7 @@ def classification_metrics(
     return metrics
 
 
-# ─────────────────────────── Segmentation ────────────────────────────────────
+# --------------------------- Segmentation ------------------------------------
 
 def dice_coefficient(
     pred_mask: np.ndarray,
@@ -106,7 +106,7 @@ def iou_score(
     return float((intersection + smooth) / (union + smooth))
 
 
-# ─────────────────────────── I/O helpers ─────────────────────────────────────
+# --------------------------- I/O helpers -------------------------------------
 
 def save_metrics(metrics: dict, path: str | Path) -> None:
     """Serialise metrics dict to JSON (skips non-serialisable values)."""
@@ -133,5 +133,5 @@ def save_metrics(metrics: dict, path: str | Path) -> None:
         with open(report_path, "w") as f:
             f.write(metrics["report"])
 
-    print(f"[metrics] Saved → {path}")
+    print(f"[metrics] Saved -> {path}")
 

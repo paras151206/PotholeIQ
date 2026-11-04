@@ -1,12 +1,12 @@
-"""
+﻿"""
 src/utils/config.py
 --------------------
 Loads config.yaml into a simple dot-accessible namespace so every script
 can do:
 
     from src.utils.config import CFG
-    print(CFG.seed)            # → 42
-    print(CFG.cnn.lr)          # → 0.0003
+    print(CFG.seed)            # -> 42
+    print(CFG.cnn.lr)          # -> 0.0003
     print(CFG.paths.results_dir)
 """
 

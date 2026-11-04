@@ -1,4 +1,4 @@
-"""
+﻿"""
 train_baseline.py — Training script for the TinyMLP baseline model (Module M2)
 
 Usage:
@@ -167,7 +167,7 @@ def run_training(model, train_loader, val_loader, optimizer, scheduler,
             best_val_loss = val_loss
             pat_count = 0
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"           → ✓ Best checkpoint saved (val_loss={val_loss:.4f})")
+            print(f"           -> OK Best checkpoint saved (val_loss={val_loss:.4f})")
         else:
             pat_count += 1
             if pat_count >= patience:
@@ -291,7 +291,7 @@ def main():
     # --- Save training curves ------------------------------------------------
     plot_path = plots_dir / f"{MODEL_NAME}_training.png"
     plot_training_curves(history, model_name=MODEL_NAME, save_path=plot_path)
-    print(f"\nTraining curves saved → {plot_path}")
+    print(f"\nTraining curves saved -> {plot_path}")
 
     # --- Test evaluation (run exactly ONCE with best checkpoint) -------------
     print("\nLoading best checkpoint for test evaluation...")
@@ -311,7 +311,7 @@ def main():
     # --- Persist metrics -----------------------------------------------------
     metrics_path = metrics_dir / f"{MODEL_NAME}_test_metrics.json"
     save_metrics(test_metrics, metrics_path)
-    print(f"Test metrics saved  → {metrics_path}")
+    print(f"Test metrics saved  -> {metrics_path}")
 
     # --- Confusion matrix ----------------------------------------------------
     cm_path = plots_dir / f"{MODEL_NAME}_confusion_matrix.png"
@@ -321,7 +321,7 @@ def main():
         model_name=MODEL_NAME,
         save_path=cm_path,
     )
-    print(f"Confusion matrix    → {cm_path}")
+    print(f"Confusion matrix    -> {cm_path}")
 
     # --- Print summary -------------------------------------------------------
     print(f"\n{'='*60}")

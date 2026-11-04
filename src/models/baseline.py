@@ -1,16 +1,16 @@
-"""
+﻿"""
 baseline.py — TinyMLP baseline model for PotholeIQ (Module M2)
 
 Architecture overview:
     Input: flattened image tensor of shape (B, 49152)
            where 49152 = 3 × 128 × 128
     
-    Flatten layer  → (B, 49152)          [handled inside forward()]
-    Linear 1       → (B, 512)            first hidden layer
-    ReLU + Dropout → (B, 512)            non-linearity + regularisation
-    Linear 2       → (B, 128)            second hidden layer
-    ReLU + Dropout → (B, 128)            non-linearity + regularisation
-    Linear 3 (out) → (B, 2)             logits for [normal, pothole]
+    Flatten layer  -> (B, 49152)          [handled inside forward()]
+    Linear 1       -> (B, 512)            first hidden layer
+    ReLU + Dropout -> (B, 512)            non-linearity + regularisation
+    Linear 2       -> (B, 128)            second hidden layer
+    ReLU + Dropout -> (B, 128)            non-linearity + regularisation
+    Linear 3 (out) -> (B, 2)             logits for [normal, pothole]
 
 The MLP is intentionally tiny so it sets a low-but-honest performance floor.
 Any CNN module that cannot beat this baseline indicates a training bug.
@@ -60,7 +60,7 @@ class TinyMLP(nn.Module):
         if hidden_dims is None:
             hidden_dims = list(CFG.baseline.hidden_dims)  # [512, 128]
 
-        # --- Layer 1: input → first hidden -----------------------------------
+        # --- Layer 1: input -> first hidden -----------------------------------
         # Projects the high-dimensional pixel vector down to 512 features.
         # Using a large first layer helps capture low-level pixel statistics.
         self.fc1 = nn.Linear(input_dim, hidden_dims[0])
@@ -71,15 +71,15 @@ class TinyMLP(nn.Module):
         # Dropout prevents co-adaptation of neurons (regularisation)
         self.drop1 = nn.Dropout(p=dropout_p)
 
-        # --- Layer 2: first hidden → second hidden ---------------------------
-        # Compresses 512 → 128; forces the network to learn a compact
+        # --- Layer 2: first hidden -> second hidden ---------------------------
+        # Compresses 512 -> 128; forces the network to learn a compact
         # representation before the classification head.
         self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
 
         self.relu2 = nn.ReLU(inplace=True)
         self.drop2 = nn.Dropout(p=dropout_p)
 
-        # --- Output layer: second hidden → logits ----------------------------
+        # --- Output layer: second hidden -> logits ----------------------------
         # Produces raw (un-normalised) scores for each class.
         # CrossEntropyLoss applies softmax internally, so no softmax here.
         self.out = nn.Linear(hidden_dims[1], num_classes)
@@ -112,7 +112,7 @@ class TinyMLP(nn.Module):
             Class logits [normal_score, pothole_score].
         """
         # Flatten the spatial + channel dimensions into a 1-D vector per image.
-        # (B, 3, 128, 128) → (B, 49152)
+        # (B, 3, 128, 128) -> (B, 49152)
         x = x.view(x.size(0), -1)
 
         # Hidden layer 1
@@ -167,4 +167,4 @@ if __name__ == "__main__":
     dummy = torch.randn(4, 3, 128, 128)
     out = model(dummy)
     assert out.shape == (4, 2), f"Unexpected output shape: {out.shape}"
-    print(f"\nSanity check passed: input {tuple(dummy.shape)} → output {tuple(out.shape)}")
+    print(f"\nSanity check passed: input {tuple(dummy.shape)} -> output {tuple(out.shape)}")

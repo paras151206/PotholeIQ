@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/utils/seed.py
 -----------------
 Centralised random-seed utility.
@@ -60,7 +60,7 @@ def worker_init_fn(worker_id: int) -> None:
     """
     Pass to DataLoader(worker_init_fn=...) so each worker gets a
     different-but-deterministic seed derived from the global seed.
-    Without this, workers share the same NumPy seed → correlated batches.
+    Without this, workers share the same NumPy seed -> correlated batches.
     """
     worker_seed = torch.initial_seed() % (2**32)
     np.random.seed(worker_seed)

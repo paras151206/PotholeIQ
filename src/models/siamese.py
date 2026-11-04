@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/models/siamese.py
 ======================
 Siamese network with contrastive loss for pothole similarity learning.
@@ -49,7 +49,7 @@ class SiameseNet(nn.Module):
             embedding_dim = CFG.siamese.embedding_dim   # 128
 
         # Build a full CustomCNN and strip the classifier to get just the
-        # feature extractor.  Shared parameters → identical weights for
+        # feature extractor.  Shared parameters -> identical weights for
         # both branches by construction (a single Module instance).
         cnn = build_cnn()
         # CNN attributes: .features (Sequential of ConvBlocks), .gap, .classifier
@@ -67,7 +67,7 @@ class SiameseNet(nn.Module):
     # --- Internal helper ---------------------------------------------------- #
 
     def _extract_features(self, x: torch.Tensor) -> torch.Tensor:
-        """Run x through conv blocks → GAP → flatten.
+        """Run x through conv blocks -> GAP -> flatten.
 
         Returns:
             (B, backbone_dim) flattened feature vector.
@@ -90,7 +90,7 @@ class SiameseNet(nn.Module):
         """
         feat = self._extract_features(x)       # (B, backbone_dim)
         emb  = self.embedding_layer(feat)      # (B, embedding_dim)
-        emb  = F.normalize(emb, p=2, dim=1)   # L2 norm → unit sphere
+        emb  = F.normalize(emb, p=2, dim=1)   # L2 norm -> unit sphere
         return emb
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor):
@@ -117,7 +117,7 @@ class ContrastiveLoss(nn.Module):
         d   = ||emb1 - emb2||_2                       (Euclidean distance)
         L   = (1 - y) * d²  +  y * max(0, m - d)²
 
-    where y=0 → same class (pull together), y=1 → different class (push apart
+    where y=0 -> same class (pull together), y=1 -> different class (push apart
     if closer than margin m).
 
     The margin *m* defines the minimum distance enforced between embeddings of

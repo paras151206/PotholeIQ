@@ -1,4 +1,4 @@
-"""
+﻿"""
 transfer.py — MobileNetV2 transfer learning model for PotholeIQ (Module M4)
 
 Design rationale
@@ -23,11 +23,11 @@ MobileNetV2 feature architecture (torchvision):
   model.classifier — Linear(1280, 1000)   ← we replace this
 
 New classifier head:
-  Dropout(dropout)         → reduces overfitting in the head
-  Linear(1280, 256)        → compresses to a task-specific representation
+  Dropout(dropout)         -> reduces overfitting in the head
+  Linear(1280, 256)        -> compresses to a task-specific representation
   ReLU()
-  Dropout(dropout / 2)     → lighter regularisation before logits
-  Linear(256, 2)           → binary classification logits
+  Dropout(dropout / 2)     -> lighter regularisation before logits
+  Linear(256, 2)           -> binary classification logits
 """
 
 import sys
@@ -83,7 +83,7 @@ class TransferModel(nn.Module):
 
         # Retain the feature extractor; discard the original 1000-class head
         self.features = backbone.features
-        # Output of features: (B, 1280, 4, 4) for 128×128 input after GAP → (B, 1280)
+        # Output of features: (B, 1280, 4, 4) for 128×128 input after GAP -> (B, 1280)
 
         # MobileNetV2 has a built-in AdaptiveAvgPool2d(1) in the classifier path.
         # We replicate it here so our custom head receives a flat (B, 1280) vector.
@@ -227,4 +227,4 @@ if __name__ == "__main__":
     dummy = torch.randn(2, 3, 128, 128)
     out = model(dummy)
     assert out.shape == (2, 2), f"Unexpected output shape: {out.shape}"
-    print(f"\nForward pass: {tuple(dummy.shape)} → {tuple(out.shape)}  ✓")
+    print(f"\nForward pass: {tuple(dummy.shape)} -> {tuple(out.shape)}  OK")

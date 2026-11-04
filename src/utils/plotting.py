@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/utils/plotting.py
 ----------------------
 Reusable plotting helpers.  Every function saves a PNG to results/plots/
@@ -33,7 +33,7 @@ def plot_training_curves(
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
-    # ── Loss ──
+    # -- Loss --
     ax1.plot(epochs, train_losses, label="Train loss", linewidth=2)
     ax1.plot(epochs, val_losses,   label="Val loss",   linewidth=2, linestyle="--")
     ax1.set_xlabel("Epoch")
@@ -42,7 +42,7 @@ def plot_training_curves(
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
-    # ── Accuracy ──
+    # -- Accuracy --
     ax2.plot(epochs, train_accs, label="Train acc", linewidth=2)
     ax2.plot(epochs, val_accs,   label="Val acc",   linewidth=2, linestyle="--")
     ax2.set_xlabel("Epoch")
@@ -56,7 +56,7 @@ def plot_training_curves(
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"[plot] Saved → {save_path}")
+        print(f"[plot] Saved -> {save_path}")
 
     return fig
 
@@ -99,7 +99,7 @@ def plot_confusion_matrix(
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"[plot] Saved → {save_path}")
+        print(f"[plot] Saved -> {save_path}")
 
     return fig
 
@@ -123,7 +123,7 @@ def plot_roc_curve(
     if save_path:
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-        print(f"[plot] Saved → {save_path}")
+        print(f"[plot] Saved -> {save_path}")
 
     return fig
 

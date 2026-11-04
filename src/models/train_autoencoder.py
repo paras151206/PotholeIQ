@@ -1,4 +1,4 @@
-"""
+﻿"""
 train_autoencoder.py — Convolutional Autoencoder training script (Module M8)
 
 Usage:
@@ -10,8 +10,8 @@ Training philosophy:
     on normal images only.
 
     At test time:
-        - Normal images → low reconstruction error (model knows what they look like)
-        - Pothole images → high reconstruction error (never seen during training)
+        - Normal images -> low reconstruction error (model knows what they look like)
+        - Pothole images -> high reconstruction error (never seen during training)
     This reconstruction error is the "anomaly score".
 
 Outputs:
@@ -21,7 +21,7 @@ Outputs:
     results/plots/autoencoder_roc.png
     results/plots/autoencoder_score_distribution.png
     results/plots/autoencoder_reconstructions.png
-    config.yaml → autoencoder.anomaly_threshold updated with best threshold
+    config.yaml -> autoencoder.anomaly_threshold updated with best threshold
 """
 
 import sys
@@ -61,7 +61,7 @@ PATIENCE = CFG.train.early_stopping_patience
 BATCH    = CFG.train.batch_size
 
 
-# ─────────────────────────── Training helpers ─────────────────────────────────
+# --------------------------- Training helpers ---------------------------------
 
 def train_epoch(model, loader, optimizer, criterion, device):
     """AE train step: input == target, minimise reconstruction loss."""
@@ -109,13 +109,13 @@ def compute_scores_for_dataset(model, csv_path, device, is_normal_only=False):
     return np.array(scores), np.array(labels_all)
 
 
-# ─────────────────────────── Threshold selection ──────────────────────────────
+# --------------------------- Threshold selection ------------------------------
 
 def find_best_threshold(scores_val, labels_val, n_thresholds=50):
     """
     Try n_thresholds evenly-spaced values between min and max val scores.
     Pick the threshold that maximises F1 score on the validation set.
-    Label convention: score > threshold → anomaly (pothole=1).
+    Label convention: score > threshold -> anomaly (pothole=1).
     """
     thresholds = np.linspace(scores_val.min(), scores_val.max(), n_thresholds)
     best_f1, best_thresh = -1.0, thresholds[len(thresholds) // 2]
@@ -130,7 +130,7 @@ def find_best_threshold(scores_val, labels_val, n_thresholds=50):
     return float(best_thresh), float(best_f1)
 
 
-# ─────────────────────────── Visualisations ───────────────────────────────────
+# --------------------------- Visualisations -----------------------------------
 
 def plot_score_distribution(scores_normal, scores_pothole, threshold, save_path):
     fig, ax = plt.subplots(figsize=(9, 4))
@@ -147,7 +147,7 @@ def plot_score_distribution(scores_normal, scores_pothole, threshold, save_path)
     fig.tight_layout()
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[autoencoder] Saved → {save_path}")
+    print(f"[autoencoder] Saved -> {save_path}")
 
 
 def plot_reconstructions(model, csv_path, device, save_path, n_normal=3, n_pothole=2):
@@ -186,10 +186,10 @@ def plot_reconstructions(model, csv_path, device, save_path, n_normal=3, n_potho
     fig.tight_layout()
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[autoencoder] Saved → {save_path}")
+    print(f"[autoencoder] Saved -> {save_path}")
 
 
-# ─────────────────────────── Main ─────────────────────────────────────────────
+# --------------------------- Main ---------------------------------------------
 
 def main():
     set_all_seeds(CFG.seed)
@@ -204,7 +204,7 @@ def main():
             print(f"[autoencoder] ERROR: {p} not found. Run src/data/split.py first.")
             sys.exit(1)
 
-    # ── Datasets — normal images only for training ────────────────────────────
+    # -- Datasets — normal images only for training ----------------------------
     tf = get_transforms("val")   # no augmentation (AE trains on clean images)
     train_ds = NormalRoadDataset(SPLITS_DIR / "train.csv", transform=tf)
     val_ds   = NormalRoadDataset(SPLITS_DIR / "val.csv",   transform=tf)
@@ -214,13 +214,13 @@ def main():
     train_loader = DataLoader(train_ds, shuffle=True,  **loader_kw)
     val_loader   = DataLoader(val_ds,   shuffle=False, **loader_kw)
 
-    # ── Model ─────────────────────────────────────────────────────────────────
+    # -- Model -----------------------------------------------------------------
     model     = build_autoencoder().to(DEVICE)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.autoencoder.lr, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
-    # ── Training loop ─────────────────────────────────────────────────────────
+    # -- Training loop ---------------------------------------------------------
     best_val_loss = float("inf")
     pat_count     = 0
     ckpt_path     = CKPT_DIR / "autoencoder_best.pth"
@@ -240,14 +240,14 @@ def main():
             best_val_loss = val_loss
             pat_count     = 0
             torch.save(model.state_dict(), ckpt_path)
-            print(f"           → Best checkpoint saved")
+            print(f"           -> Best checkpoint saved")
         else:
             pat_count += 1
             if pat_count >= PATIENCE:
                 print(f"Early stopping at epoch {epoch+1}")
                 break
 
-    # ── Training curves ───────────────────────────────────────────────────────
+    # -- Training curves -------------------------------------------------------
     ep = range(1, len(tr_losses) + 1)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(ep, tr_losses,  label="Train reconstruction loss", lw=2)
@@ -258,7 +258,7 @@ def main():
     fig.savefig(PLOTS_DIR / "autoencoder_training.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-    # ── Threshold selection on validation set ─────────────────────────────────
+    # -- Threshold selection on validation set ---------------------------------
     model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
     print("\n[autoencoder] Computing anomaly scores on val set for threshold tuning...")
     val_scores, val_labels = compute_scores_for_dataset(
@@ -267,7 +267,7 @@ def main():
     threshold, val_f1 = find_best_threshold(val_scores, val_labels)
     print(f"[autoencoder] Best threshold (val F1={val_f1:.4f}): {threshold:.6f}")
 
-    # ── Test evaluation ───────────────────────────────────────────────────────
+    # -- Test evaluation -------------------------------------------------------
     print("[autoencoder] Computing anomaly scores on test set...")
     test_scores, test_labels = compute_scores_for_dataset(
         model, SPLITS_DIR / "test.csv", DEVICE
@@ -299,17 +299,17 @@ def main():
     }
     save_metrics(test_metrics, METRICS_DIR / "autoencoder_test_metrics.json")
 
-    # ── Score distribution plot ───────────────────────────────────────────────
+    # -- Score distribution plot -----------------------------------------------
     normal_scores  = test_scores[test_labels == 0]
     pothole_scores = test_scores[test_labels == 1]
     plot_score_distribution(normal_scores, pothole_scores, threshold,
                             PLOTS_DIR / "autoencoder_score_distribution.png")
 
-    # ── Reconstruction plot ───────────────────────────────────────────────────
+    # -- Reconstruction plot ---------------------------------------------------
     plot_reconstructions(model, SPLITS_DIR / "test.csv", DEVICE,
                          PLOTS_DIR / "autoencoder_reconstructions.png")
 
-    # ── Save threshold to config.yaml ─────────────────────────────────────────
+    # -- Save threshold to config.yaml -----------------------------------------
     cfg_path = ROOT / "config.yaml"
     with open(cfg_path, "r") as f:
         cfg_raw = yaml.safe_load(f)
@@ -318,18 +318,19 @@ def main():
         yaml.dump(cfg_raw, f, default_flow_style=False, sort_keys=False)
     print(f"[autoencoder] Updated config.yaml: anomaly_threshold={threshold:.6f}")
 
-    # ── Summary ───────────────────────────────────────────────────────────────
-    print(f"\n{'─'*60}")
+    # -- Summary ---------------------------------------------------------------
+    print(f"\n{'-'*60}")
     print(f"  [autoencoder] TEST RESULTS")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
     print(f"  ROC-AUC   : {auc:.4f}" if auc else "  ROC-AUC   : N/A")
     print(f"  Threshold : {threshold:.6f}")
     print(f"  Accuracy  : {test_metrics['accuracy']:.4f}")
     print(f"  Precision : {test_metrics['precision']:.4f}")
     print(f"  Recall    : {test_metrics['recall']:.4f}")
     print(f"  F1        : {test_metrics['f1']:.4f}")
-    print(f"{'─'*60}\n")
+    print(f"{'-'*60}\n")
 
 
 if __name__ == "__main__":
     main()
+

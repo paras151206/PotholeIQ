@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/data/eda.py
 ----------------
 Exploratory Data Analysis for the PotholeIQ dataset.
@@ -43,7 +43,7 @@ CLASS_NAMES = ["normal", "pothole"]
 COLORS      = ["steelblue", "tomato"]
 
 
-# ─────────────────────────── Helpers ─────────────────────────────────────────
+# --------------------------- Helpers -----------------------------------------
 
 def load_all_splits() -> dict[str, pd.DataFrame]:
     dfs = {}
@@ -56,7 +56,7 @@ def load_all_splits() -> dict[str, pd.DataFrame]:
     return dfs
 
 
-# ─────────────────────────── Plot 1: Class Distribution ──────────────────────
+# --------------------------- Plot 1: Class Distribution ----------------------
 
 def plot_class_distribution(dfs: dict[str, pd.DataFrame]):
     fig, axes = plt.subplots(1, len(dfs), figsize=(4 * len(dfs), 4), sharey=False)
@@ -80,10 +80,10 @@ def plot_class_distribution(dfs: dict[str, pd.DataFrame]):
     out = PLOTS_DIR / "class_distribution.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[eda] Saved → {out}")
+    print(f"[eda] Saved -> {out}")
 
 
-# ─────────────────────────── Plot 2: Sample Images ───────────────────────────
+# --------------------------- Plot 2: Sample Images ---------------------------
 
 def plot_sample_images(dfs: dict[str, pd.DataFrame], n_per_class: int = 5):
     """Show n_per_class examples from each class (using the train split)."""
@@ -115,10 +115,10 @@ def plot_sample_images(dfs: dict[str, pd.DataFrame], n_per_class: int = 5):
     out = PLOTS_DIR / "sample_images.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[eda] Saved → {out}")
+    print(f"[eda] Saved -> {out}")
 
 
-# ─────────────────────────── Plot 3: Image Sizes ─────────────────────────────
+# --------------------------- Plot 3: Image Sizes -----------------------------
 
 def plot_image_sizes(dfs: dict[str, pd.DataFrame], max_samples: int = 500):
     df = dfs.get("train", next(iter(dfs.values())))
@@ -159,12 +159,12 @@ def plot_image_sizes(dfs: dict[str, pd.DataFrame], max_samples: int = 500):
     out = PLOTS_DIR / "image_size_distribution.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[eda] Saved → {out}")
+    print(f"[eda] Saved -> {out}")
     print(f"[eda] Size stats: W={np.mean(widths):.0f}±{np.std(widths):.0f}, "
           f"H={np.mean(heights):.0f}±{np.std(heights):.0f}")
 
 
-# ─────────────────────────── Plot 4: Pixel Intensity ─────────────────────────
+# --------------------------- Plot 4: Pixel Intensity -------------------------
 
 def plot_pixel_intensity(dfs: dict[str, pd.DataFrame], max_samples: int = 200):
     df = dfs.get("train", next(iter(dfs.values())))
@@ -201,10 +201,10 @@ def plot_pixel_intensity(dfs: dict[str, pd.DataFrame], max_samples: int = 200):
     out = PLOTS_DIR / "pixel_intensity.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[eda] Saved → {out}")
+    print(f"[eda] Saved -> {out}")
 
 
-# ─────────────────────────── Plot 5: BBox Area Distribution ──────────────────
+# --------------------------- Plot 5: BBox Area Distribution ------------------
 
 def plot_bbox_area(dfs: dict[str, pd.DataFrame]):
     """
@@ -278,11 +278,11 @@ def plot_bbox_area(dfs: dict[str, pd.DataFrame]):
     out = PLOTS_DIR / "bbox_area_distribution.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[eda] Saved → {out}")
+    print(f"[eda] Saved -> {out}")
     print(f"[eda] Severity distribution: Low={n_low}, Medium={n_med}, High={n_high}")
 
 
-# ─────────────────────────── Main ────────────────────────────────────────────
+# --------------------------- Main --------------------------------------------
 
 def main():
     print(f"\n{'='*55}")
@@ -295,14 +295,14 @@ def main():
         sys.exit(1)
 
     # Print summary to console (for README data card)
-    print("\n── Split Summary ──")
+    print("\n-- Split Summary --")
     for split, df in dfs.items():
         n = len(df)
         p = (df["label"] == 1).sum()
         no = (df["label"] == 0).sum()
         print(f"  {split:5s}: {n:5d} images  pothole={p} ({100*p/n:.1f}%)  normal={no} ({100*no/n:.1f}%)")
 
-    print("\n── Generating plots ──")
+    print("\n-- Generating plots --")
     plot_class_distribution(dfs)
     plot_sample_images(dfs)
     plot_image_sizes(dfs)
@@ -310,7 +310,7 @@ def main():
     plot_bbox_area(dfs)
 
     print(f"\n[eda] All plots saved to {PLOTS_DIR}")
-    print("[eda] ✓ EDA complete.\n")
+    print("[eda] OK EDA complete.\n")
 
 
 if __name__ == "__main__":

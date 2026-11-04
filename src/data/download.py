@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/data/download.py
 ---------------------
 Download the Kaggle Pothole Detection dataset.
@@ -13,7 +13,7 @@ Usage:
 Authentication:
   Option 1 (recommended): Set KAGGLE_USERNAME and KAGGLE_KEY env vars.
   Option 2: Place ~/.kaggle/kaggle.json with your credentials.
-  Obtain your API token from https://www.kaggle.com/settings → API → Create New Token
+  Obtain your API token from https://www.kaggle.com/settings -> API -> Create New Token
 
 If Kaggle credentials are not found, the script prints manual download
 instructions and exits with code 1.
@@ -73,7 +73,7 @@ def download_kaggle() -> bool:
             unzip=True,
             quiet=False,
         )
-        print(f"[download] ✓ Dataset downloaded to {RAW_DIR}")
+        print(f"[download] OK Dataset downloaded to {RAW_DIR}")
         return True
     except Exception as e:
         print(f"[download] Kaggle download failed: {e}")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/explainability/run_gradcam.py
 ==================================
 Applies Grad-CAM to the trained CustomCNN and saves visualisation grids.
@@ -126,7 +126,7 @@ def save_grid(samples, title: str, out_path: Path, cols: int = 2):
     plt.tight_layout()
     plt.savefig(out_path, dpi=120, bbox_inches="tight")
     plt.close(fig)
-    print(f"[INFO] Saved → {out_path}")
+    print(f"[INFO] Saved -> {out_path}")
 
 
 def failure_note(pred_label: int, true_label: int, conf: float) -> str:
@@ -136,7 +136,7 @@ def failure_note(pred_label: int, true_label: int, conf: float) -> str:
     the confidence level and direction of error — this is a heuristic that
     flags potential issues for a human reviewer to investigate.
     """
-    direction = f"{CLASS_NAMES[true_label]} → {CLASS_NAMES[pred_label]}"
+    direction = f"{CLASS_NAMES[true_label]} -> {CLASS_NAMES[pred_label]}"
     if pred_label == 1 and true_label == 0:
         # False positive: model said pothole on a normal road
         if conf > 0.85:
@@ -249,8 +249,8 @@ def main():
         fn_cases = [s for s in incorrect_samples if s["pred_label"] == 0 and s["true_label"] == 1]
 
         f.write(f"Total misclassified analysed: {len(incorrect_samples)}\n")
-        f.write(f"  False Positives (normal → pothole): {len(fp_cases)}\n")
-        f.write(f"  False Negatives (pothole → normal): {len(fn_cases)}\n\n")
+        f.write(f"  False Positives (normal -> pothole): {len(fp_cases)}\n")
+        f.write(f"  False Negatives (pothole -> normal): {len(fn_cases)}\n\n")
 
         f.write("-" * 72 + "\n")
         f.write("Per-image breakdown:\n\n")
@@ -290,7 +290,7 @@ def main():
                   brightness/contrast augmentation.
             """))
 
-    print(f"[INFO] Failure analysis saved → {fail_path}")
+    print(f"[INFO] Failure analysis saved -> {fail_path}")
     print("\n[DONE] Grad-CAM analysis complete.")
 
 

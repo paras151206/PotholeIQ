@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/data/split.py
 ------------------
 Stratified train/val/test split for the PotholeIQ dataset.
@@ -35,7 +35,7 @@ from sklearn.model_selection import train_test_split
 from src.utils.config import CFG
 from src.utils.seed import set_all_seeds
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# -- Paths ---------------------------------------------------------------------
 RAW_DIR    = ROOT / "data" / "raw"
 PROC_DIR   = ROOT / "data" / "processed"
 SPLITS_DIR = ROOT / "data" / "splits"
@@ -45,7 +45,7 @@ TRAIN_RATIO, VAL_RATIO, TEST_RATIO = CFG.data.split_ratios   # e.g. 0.70, 0.15, 
 SEED = CFG.seed
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
-# ─────────────────────────── Dataset Discovery ───────────────────────────────
+# --------------------------- Dataset Discovery -------------------------------
 
 def discover_dataset(raw_dir: Path) -> pd.DataFrame:
     """
@@ -61,7 +61,7 @@ def discover_dataset(raw_dir: Path) -> pd.DataFrame:
     """
     records = []
 
-    # ── Layout A: YOLO split folders ─────────────────────────────────────────
+    # -- Layout A: YOLO split folders -----------------------------------------
     yolo_splits = []
     for split_name in ["train", "valid", "test", "Train", "Valid", "Test"]:
         sd = raw_dir / split_name
@@ -76,11 +76,11 @@ def discover_dataset(raw_dir: Path) -> pd.DataFrame:
             for img_path in img_dir.rglob("*"):
                 if img_path.suffix.lower() not in IMAGE_EXTS:
                     continue
-                # Determine class from YOLO label: if .txt exists and has content → pothole
+                # Determine class from YOLO label: if .txt exists and has content -> pothole
                 txt_path = label_dir / (img_path.stem + ".txt")
                 if txt_path.exists():
                     content = txt_path.read_text().strip()
-                    label = 1 if content else 0   # has annotation → pothole
+                    label = 1 if content else 0   # has annotation -> pothole
                     bbox_path = str(txt_path) if content else ""
                 else:
                     # Try to find in any labels subfolder
@@ -94,7 +94,7 @@ def discover_dataset(raw_dir: Path) -> pd.DataFrame:
         if records:
             return pd.DataFrame(records)
 
-    # ── Layout B: Class folders ───────────────────────────────────────────────
+    # -- Layout B: Class folders -----------------------------------------------
     class_map = {}
     for cls_name in raw_dir.iterdir():
         if not cls_name.is_dir():
@@ -125,7 +125,7 @@ def discover_dataset(raw_dir: Path) -> pd.DataFrame:
         if records:
             return pd.DataFrame(records)
 
-    # ── Layout C: Flat images + labels/ ──────────────────────────────────────
+    # -- Layout C: Flat images + labels/ --------------------------------------
     img_dir   = raw_dir / "images"
     label_dir = raw_dir / "labels"
     if not img_dir.exists():
@@ -159,7 +159,7 @@ def discover_dataset(raw_dir: Path) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-# ─────────────────────────── Split & Verify ──────────────────────────────────
+# --------------------------- Split & Verify ----------------------------------
 
 def stratified_split(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -200,16 +200,17 @@ def verify_no_leakage(
     test_df:  pd.DataFrame,
 ) -> bool:
     """
-    Check that no image filename appears in more than one split.
-    Uses stem (filename without extension) for robust matching.
+    Check that no image FILE PATH appears in more than one split.
+    Uses full filepath (not stem) so that same-named files in different
+    class folders are correctly treated as distinct images.
     Returns True if clean, raises AssertionError if leakage detected.
     """
-    def stems(df):
-        return set(Path(p).stem for p in df["filepath"])
+    def fpaths(df):
+        return set(df["filepath"].tolist())
 
-    train_s = stems(train_df)
-    val_s   = stems(val_df)
-    test_s  = stems(test_df)
+    train_s = fpaths(train_df)
+    val_s   = fpaths(val_df)
+    test_s  = fpaths(test_df)
 
     tv = train_s & val_s
     tt = train_s & test_s
@@ -222,7 +223,7 @@ def verify_no_leakage(
             f"  train∩test: {len(tt)} files\n"
             f"  val∩test:   {len(vt)} files"
         )
-    print("[split] ✓ No data leakage detected between splits.")
+    print("[split] No data leakage detected between splits.")
     return True
 
 
@@ -251,7 +252,7 @@ def print_split_stats(
     return summary
 
 
-# ─────────────────────────── Main ────────────────────────────────────────────
+# --------------------------- Main --------------------------------------------
 
 def main():
     set_all_seeds(SEED)
@@ -279,9 +280,9 @@ def main():
     verify_no_leakage(train_df, val_df, test_df)
 
     # 4. Print stats
-    print(f"\n{'─'*55}")
+    print("\n" + "-"*55)
     print("  Split Statistics")
-    print(f"{'─'*55}")
+    print("-"*55)
     summary = print_split_stats(train_df, val_df, test_df, full_df)
 
     # 5. Save CSV files
@@ -289,18 +290,18 @@ def main():
         # Classification CSV (filepath, label)
         cls_path = SPLITS_DIR / f"{name}.csv"
         df[["filepath", "label"]].to_csv(cls_path, index=False)
-        print(f"[split] Saved → {cls_path}")
+        print(f"[split] Saved -> {cls_path}")
 
         # Segmentation CSV (filepath, label, bbox_path)
         seg_path = SPLITS_DIR / f"seg_{name}.csv"
         df.to_csv(seg_path, index=False)
-        print(f"[split] Saved → {seg_path}")
+        print(f"[split] Saved -> {seg_path}")
 
     # 6. Save summary
     summary_path = SPLITS_DIR / "split_summary.json"
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"[split] Saved → {summary_path}")
+    print(f"[split] Saved -> {summary_path}")
 
     print(f"\n{'='*55}")
     print("  Split complete. Use these CSVs in all training scripts.")

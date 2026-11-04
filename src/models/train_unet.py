@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/models/train_unet.py
 ========================
 Training script for the SmallUNet segmentation model.
@@ -211,7 +211,7 @@ def save_prediction_grid(model, test_loader, num_samples: int = 5):
     out_path = PLOTS_DIR / "unet_predictions.png"
     plt.savefig(out_path, dpi=100)
     plt.close(fig)
-    print(f"[INFO] Saved prediction grid → {out_path}")
+    print(f"[INFO] Saved prediction grid -> {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ def main():
             best_val_loss = va_loss
             patience_counter = 0
             torch.save(model.state_dict(), BEST_CKPT)
-            print(f"  → Saved best checkpoint (val_loss={va_loss:.4f})")
+            print(f"  -> Saved best checkpoint (val_loss={va_loss:.4f})")
         else:
             patience_counter += 1
             if patience_counter >= patience:
@@ -329,7 +329,7 @@ def main():
         "severity_distribution": sev_counts,
     }
     save_metrics(metrics, METRICS_DIR / "unet_metrics.json")
-    print(f"[INFO] Metrics saved → {METRICS_DIR / 'unet_metrics.json'}")
+    print(f"[INFO] Metrics saved -> {METRICS_DIR / 'unet_metrics.json'}")
 
     # ---- Training curves ---------------------------------------------------
     plot_training_curves(
@@ -337,7 +337,7 @@ def main():
         title="U-Net Training Curves",
         save_path=str(PLOTS_DIR / "unet_training.png"),
     )
-    print(f"[INFO] Training plot saved → {PLOTS_DIR / 'unet_training.png'}")
+    print(f"[INFO] Training plot saved -> {PLOTS_DIR / 'unet_training.png'}")
 
     # ---- Prediction visualisation -----------------------------------------
     save_prediction_grid(model, test_loader, num_samples=5)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 src/data/dataset.py
 --------------------
 PyTorch Dataset classes for PotholeIQ.
@@ -28,7 +28,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
-# ── Project utilities ─────────────────────────────────────────────────────────
+# -- Project utilities ---------------------------------------------------------
 import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -38,7 +38,7 @@ H, W = CFG.data.image_size          # e.g. [128, 128]
 MEAN = CFG.augmentation.normalize_mean
 STD  = CFG.augmentation.normalize_std
 
-# ─────────────────────────── Transforms ──────────────────────────────────────
+# --------------------------- Transforms --------------------------------------
 
 def get_transforms(split: str) -> T.Compose:
     """
@@ -85,7 +85,7 @@ def get_aug_pair_transform() -> T.Compose:
     """
     Strong augmentation transform that returns a heavily-augmented view.
     Used by SiameseDataset to generate positive pairs.
-    Two calls on the same image → two different augmented views.
+    Two calls on the same image -> two different augmented views.
     """
     aug = CFG.augmentation
     return T.Compose([
@@ -101,7 +101,7 @@ def get_aug_pair_transform() -> T.Compose:
     ])
 
 
-# ─────────────────────────── Classification Dataset ──────────────────────────
+# --------------------------- Classification Dataset --------------------------
 
 class PotholeDataset(Dataset):
     """
@@ -157,7 +157,7 @@ class PotholeDataset(Dataset):
         return self.df["label"].tolist()
 
 
-# ─────────────────────────── Segmentation Dataset ────────────────────────────
+# --------------------------- Segmentation Dataset ----------------------------
 
 def _yolo_to_mask(
     bbox_line: str,
@@ -252,7 +252,7 @@ class PotholeSegDataset(Dataset):
         return img, mask_tensor
 
 
-# ─────────────────────────── Siamese Dataset ─────────────────────────────────
+# --------------------------- Siamese Dataset ---------------------------------
 
 class SiameseDataset(Dataset):
     """
@@ -268,8 +268,8 @@ class SiameseDataset(Dataset):
         A pothole image paired with a normal-road image.
 
     Returns: (img1, img2, is_different_int)
-        is_different = 0 → same class (positive pair)
-        is_different = 1 → different class (negative pair)
+        is_different = 0 -> same class (positive pair)
+        is_different = 1 -> different class (negative pair)
     This is the convention used in contrastive loss.
     """
 
@@ -322,13 +322,13 @@ class SiameseDataset(Dataset):
         return img1, img2, label
 
 
-# ─────────────────────────── Autoencoder Dataset ─────────────────────────────
+# --------------------------- Autoencoder Dataset -----------------------------
 
 class NormalRoadDataset(Dataset):
     """
     Dataset containing ONLY normal (non-pothole) road images.
     Used to train the autoencoder on the normal class only.
-    At inference, potholes → high reconstruction error → anomaly.
+    At inference, potholes -> high reconstruction error -> anomaly.
     """
 
     def __init__(

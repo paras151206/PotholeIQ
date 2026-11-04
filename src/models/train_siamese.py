@@ -1,4 +1,4 @@
-"""
+﻿"""
 train_siamese.py — Siamese network training script (Module M7)
 
 Usage:
@@ -56,7 +56,7 @@ MARGIN    = CFG.siamese.margin
 BATCH     = CFG.train.batch_size
 
 
-# ─────────────────────────── Train / eval helpers ─────────────────────────────
+# --------------------------- Train / eval helpers -----------------------------
 
 def train_epoch(model, loader, optimizer, criterion, device, margin):
     model.train()
@@ -93,7 +93,7 @@ def eval_epoch(model, loader, criterion, device, margin):
     return total_loss / total, correct / total
 
 
-# ─────────────────────────── t-SNE visualisation ─────────────────────────────
+# --------------------------- t-SNE visualisation -----------------------------
 
 def plot_tsne(model, csv_path, device, save_path, max_samples=300):
     """
@@ -140,10 +140,10 @@ def plot_tsne(model, csv_path, device, save_path, max_samples=300):
     fig.tight_layout()
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"[siamese] t-SNE saved → {save_path}")
+    print(f"[siamese] t-SNE saved -> {save_path}")
 
 
-# ─────────────────────────── Main ─────────────────────────────────────────────
+# --------------------------- Main ---------------------------------------------
 
 def main():
     set_all_seeds(CFG.seed)
@@ -159,7 +159,7 @@ def main():
             print(f"[siamese] ERROR: {p} not found. Run src/data/split.py first.")
             sys.exit(1)
 
-    # ── Datasets ──────────────────────────────────────────────────────────────
+    # -- Datasets --------------------------------------------------------------
     val_tf = get_transforms("val")
     train_ds = SiameseDataset(SPLITS_DIR / "train.csv", transform=val_tf)
     val_ds   = SiameseDataset(SPLITS_DIR / "val.csv",   transform=val_tf)
@@ -169,13 +169,13 @@ def main():
     train_loader = DataLoader(train_ds, shuffle=True,  **loader_kw)
     val_loader   = DataLoader(val_ds,   shuffle=False, **loader_kw)
 
-    # ── Model ─────────────────────────────────────────────────────────────────
+    # -- Model -----------------------------------------------------------------
     model     = build_siamese().to(DEVICE)
     criterion = ContrastiveLoss(margin=MARGIN)
     optimizer = torch.optim.Adam(model.parameters(), lr=CFG.siamese.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
-    # ── Training loop ─────────────────────────────────────────────────────────
+    # -- Training loop ---------------------------------------------------------
     best_val_loss = float("inf")
     pat_count     = 0
     ckpt_path     = CKPT_DIR / "siamese_best.pth"
@@ -199,14 +199,14 @@ def main():
             best_val_loss = val_loss
             pat_count     = 0
             torch.save(model.state_dict(), ckpt_path)
-            print(f"           → Best checkpoint saved")
+            print(f"           -> Best checkpoint saved")
         else:
             pat_count += 1
             if pat_count >= PATIENCE:
                 print(f"Early stopping at epoch {epoch+1}")
                 break
 
-    # ── Training curves ───────────────────────────────────────────────────────
+    # -- Training curves -------------------------------------------------------
     epochs_ran = len(history["train_loss"])
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
     ep = range(1, epochs_ran + 1)
@@ -222,7 +222,7 @@ def main():
     fig.savefig(PLOTS_DIR / "siamese_training.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-    # ── Test evaluation ───────────────────────────────────────────────────────
+    # -- Test evaluation -------------------------------------------------------
     model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
     test_ds  = SiameseDataset(SPLITS_DIR / "test.csv", transform=val_tf)
     test_loader = DataLoader(test_ds, shuffle=False, **loader_kw)
@@ -252,21 +252,22 @@ def main():
     }
     save_metrics(metrics, METRICS_DIR / "siamese_test_metrics.json")
 
-    print(f"\n{'─'*60}")
+    print(f"\n{'-'*60}")
     print(f"  [siamese] TEST RESULTS")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
     print(f"  Contrastive loss : {test_loss:.4f}")
     print(f"  Pair accuracy    : {test_acc:.4f}")
     if same_dists:
         print(f"  Avg dist (same)  : {np.mean(same_dists):.4f}")
     if diff_dists:
         print(f"  Avg dist (diff)  : {np.mean(diff_dists):.4f}")
-    print(f"{'─'*60}\n")
+    print(f"{'-'*60}\n")
 
-    # ── t-SNE ─────────────────────────────────────────────────────────────────
+    # -- t-SNE -----------------------------------------------------------------
     plot_tsne(model, SPLITS_DIR / "test.csv", DEVICE,
               PLOTS_DIR / "siamese_tsne.png", max_samples=300)
 
 
 if __name__ == "__main__":
     main()
+

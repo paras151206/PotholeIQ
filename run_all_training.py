@@ -90,3 +90,4 @@ if failed:
 else:
     print("  ✅ All steps completed successfully.")
     print("  Run:  streamlit run app/app.py\n")
+

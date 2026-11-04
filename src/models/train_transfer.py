@@ -1,4 +1,4 @@
-"""
+﻿"""
 train_transfer.py — Two-phase MobileNetV2 fine-tuning script (Module M4)
 
 Usage:
@@ -51,7 +51,7 @@ for d in [CKPT_DIR, PLOTS_DIR, METRICS_DIR]:
 PATIENCE = CFG.train.early_stopping_patience
 
 
-# ─────────────────────────── Training helpers ────────────────────────────────
+# --------------------------- Training helpers --------------------------------
 
 def train_epoch(model, loader, optimizer, criterion, device):
     model.train()
@@ -115,7 +115,7 @@ def train_phase(model, train_loader, val_loader, optimizer, scheduler, criterion
             best_val_loss = val_loss
             pat_count     = 0
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"            → Best checkpoint saved (val_loss={val_loss:.4f})")
+            print(f"            -> Best checkpoint saved (val_loss={val_loss:.4f})")
         else:
             pat_count += 1
             if pat_count >= patience:
@@ -125,7 +125,7 @@ def train_phase(model, train_loader, val_loader, optimizer, scheduler, criterion
     return history
 
 
-# ─────────────────────────── Main ────────────────────────────────────────────
+# --------------------------- Main --------------------------------------------
 
 def main():
     set_all_seeds(CFG.seed)
@@ -133,14 +133,14 @@ def main():
     print(f"  PotholeIQ — M4 Transfer Learning | device={DEVICE}")
     print(f"{'='*60}\n")
 
-    # ── Verify splits exist ───────────────────────────────────────────────────
+    # -- Verify splits exist ---------------------------------------------------
     for split in ["train", "val", "test"]:
         p = SPLITS_DIR / f"{split}.csv"
         if not p.exists():
             print(f"[transfer] ERROR: {p} not found. Run src/data/split.py first.")
             sys.exit(1)
 
-    # ── DataLoaders ───────────────────────────────────────────────────────────
+    # -- DataLoaders -----------------------------------------------------------
     train_tf = get_transforms("train")
     val_tf   = get_transforms("val")
 
@@ -162,14 +162,14 @@ def main():
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-    # ── Build model ───────────────────────────────────────────────────────────
+    # -- Build model -----------------------------------------------------------
     model = build_transfer_model(pretrained=True).to(DEVICE)
     print(f"[transfer] MobileNetV2 loaded (pretrained=True)")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 1 — Frozen backbone, train head only
     # ═══════════════════════════════════════════════════════════════════════════
-    print(f"\n── Phase 1: Frozen backbone ({CFG.transfer.phase1_epochs} epochs) ──")
+    print(f"\n-- Phase 1: Frozen backbone ({CFG.transfer.phase1_epochs} epochs) --")
     model.freeze_backbone()
 
     # Only pass head parameters to the optimizer
@@ -191,8 +191,8 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════════
     # PHASE 2 — Unfreeze last blocks, fine-tune with low LR
     # ═══════════════════════════════════════════════════════════════════════════
-    print(f"\n── Phase 2: Unfreezing last {CFG.transfer.unfreeze_blocks} blocks "
-          f"({CFG.transfer.phase2_epochs} epochs) ──")
+    print(f"\n-- Phase 2: Unfreezing last {CFG.transfer.unfreeze_blocks} blocks "
+          f"({CFG.transfer.phase2_epochs} epochs) --")
     model.unfreeze_last_blocks(CFG.transfer.unfreeze_blocks)
 
     # Optimizer now covers all unfrozen parameters
@@ -207,7 +207,7 @@ def main():
     h2 = train_phase(model, train_loader, val_loader, opt2, sch2, criterion,
                      DEVICE, CFG.transfer.phase2_epochs, PATIENCE, ckpt2, "Phase2")
 
-    # ── Save combined training curves ─────────────────────────────────────────
+    # -- Save combined training curves -----------------------------------------
     # Concatenate phase1 + phase2 histories for the plot
     combined_tr_loss  = h1["train_loss"] + h2["train_loss"]
     combined_val_loss = h1["val_loss"]   + h2["val_loss"]
@@ -221,7 +221,7 @@ def main():
         save_path=PLOTS_DIR / "transfer_training.png",
     )
 
-    # ── Test evaluation (ONCE, using best phase2 checkpoint) ─────────────────
+    # -- Test evaluation (ONCE, using best phase2 checkpoint) -----------------
     model.load_state_dict(torch.load(ckpt2, map_location=DEVICE))
     _, _, test_preds, test_labels, test_probs = eval_epoch(model, test_loader, criterion, DEVICE)
 
@@ -235,18 +235,19 @@ def main():
         save_path=PLOTS_DIR / "transfer_confusion_matrix.png",
     )
 
-    # ── Print summary ─────────────────────────────────────────────────────────
-    print(f"\n{'─'*60}")
+    # -- Print summary ---------------------------------------------------------
+    print(f"\n{'-'*60}")
     print(f"  [transfer] TEST RESULTS")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
     print(f"  Accuracy  : {test_metrics['accuracy']:.4f}")
     print(f"  Precision : {test_metrics['precision']:.4f}")
     print(f"  Recall    : {test_metrics['recall']:.4f}")
     print(f"  F1        : {test_metrics['f1']:.4f}")
     if test_metrics.get("roc_auc"):
         print(f"  ROC-AUC   : {test_metrics['roc_auc']:.4f}")
-    print(f"{'─'*60}\n")
+    print(f"{'-'*60}\n")
 
 
 if __name__ == "__main__":
     main()
+

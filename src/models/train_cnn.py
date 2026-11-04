@@ -1,4 +1,4 @@
-"""
+﻿"""
 train_cnn.py — Training script for CustomCNN + ablation studies (Module M3)
 
 Usage:
@@ -146,7 +146,7 @@ def run_training(model, train_loader, val_loader, optimizer, scheduler,
             best_val_loss = val_loss
             pat_count = 0
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"           → ✓ Checkpoint saved (val_loss={val_loss:.4f})")
+            print(f"           -> OK Checkpoint saved (val_loss={val_loss:.4f})")
         else:
             pat_count += 1
             if pat_count >= patience:
@@ -222,7 +222,7 @@ def single_run(
     use_scheduler=True,
 ):
     """
-    One complete train→validate→test cycle.
+    One complete train->validate->test cycle.
 
     Parameters mirror the training hyper-parameters and are explicit
     so ablations can selectively override them.
@@ -235,7 +235,7 @@ def single_run(
 
     scheduler = None
     if use_scheduler:
-        # CosineAnnealingLR decays LR from lr → ~0 over T_max epochs;
+        # CosineAnnealingLR decays LR from lr -> ~0 over T_max epochs;
         # avoids a fixed step schedule and tends to escape local minima.
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=epochs
@@ -260,7 +260,7 @@ def single_run(
     # --- Save training curves ---------------------------------------------
     plot_path = plots_dir / f"{run_name}_training.png"
     plot_training_curves(history, model_name=run_name, save_path=plot_path)
-    print(f"\n[{run_name}] Training curves → {plot_path}")
+    print(f"\n[{run_name}] Training curves -> {plot_path}")
 
     # --- Test evaluation with best checkpoint -----------------------------
     model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
@@ -276,7 +276,7 @@ def single_run(
     )
     metrics_path = metrics_dir / f"{run_name}_test_metrics.json"
     save_metrics(test_metrics, metrics_path)
-    print(f"[{run_name}] Metrics        → {metrics_path}")
+    print(f"[{run_name}] Metrics        -> {metrics_path}")
 
     # --- Confusion matrix -------------------------------------------------
     cm_path = plots_dir / f"{run_name}_confusion_matrix.png"
@@ -286,18 +286,18 @@ def single_run(
         model_name=run_name,
         save_path=cm_path,
     )
-    print(f"[{run_name}] Confusion mat  → {cm_path}")
+    print(f"[{run_name}] Confusion mat  -> {cm_path}")
 
     # --- Print key metrics ------------------------------------------------
-    print(f"\n{'─'*55}")
+    print(f"\n{'-'*55}")
     print(f"  [{run_name}] TEST RESULTS")
-    print(f"{'─'*55}")
+    print(f"{'-'*55}")
     for k, v in test_metrics.items():
         if isinstance(v, float):
             print(f"  {k:<30} {v:.4f}")
         else:
             print(f"  {k:<30} {v}")
-    print(f"{'─'*55}\n")
+    print(f"{'-'*55}\n")
 
     return test_metrics
 
@@ -340,7 +340,7 @@ def overfit_sanity_check(train_ds, val_loader, ckpt_dir, plots_dir):
 
     final_acc = history["train_acc"][-1]
     if final_acc >= 0.95:
-        print(f"\n  ✓ Sanity check PASSED (final train acc = {final_acc:.4f})")
+        print(f"\n  OK Sanity check PASSED (final train acc = {final_acc:.4f})")
     else:
         print(f"\n  ✗ Sanity check WARNING — train acc only {final_acc:.4f} (expected ≥ 0.95)")
         print("    Check data loading and model forward pass.")
@@ -355,7 +355,7 @@ def overfit_sanity_check(train_ds, val_loader, ckpt_dir, plots_dir):
         model_name="cnn_overfit_sanity",
         save_path=sc_plot,
     )
-    print(f"  Sanity-check plot → {sc_plot}\n")
+    print(f"  Sanity-check plot -> {sc_plot}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ def main():
     # =========================================================================
     overfit_sanity_check(train_ds, val_loader, ckpt_dir, plots_dir)
 
-    print("\n✓ All CNN runs complete.\n")
+    print("\nOK All CNN runs complete.\n")
 
 
 if __name__ == "__main__":

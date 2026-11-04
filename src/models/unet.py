@@ -1,27 +1,27 @@
-"""
+﻿"""
 src/models/unet.py
 ==================
 Lightweight U-Net for binary road-pothole segmentation.
 
 Architecture (input: B×3×128×128):
   Encoder:
-    enc1: DoubleConv(3,   32)   → (B, 32,  128,128)
-    pool → (B, 32,  64, 64)
-    enc2: DoubleConv(32,  64)   → (B, 64,  64, 64)
-    pool → (B, 64,  32, 32)
-    enc3: DoubleConv(64, 128)   → (B,128,  32, 32)
-    pool → (B,128,  16, 16)
+    enc1: DoubleConv(3,   32)   -> (B, 32,  128,128)
+    pool -> (B, 32,  64, 64)
+    enc2: DoubleConv(32,  64)   -> (B, 64,  64, 64)
+    pool -> (B, 64,  32, 32)
+    enc3: DoubleConv(64, 128)   -> (B,128,  32, 32)
+    pool -> (B,128,  16, 16)
   Bottleneck:
-    DoubleConv(128, 256)        → (B,256,  16, 16)
+    DoubleConv(128, 256)        -> (B,256,  16, 16)
   Decoder:
-    up3: ConvTranspose2d(256→128) → (B,128,32,32) ; cat enc3 → (B,256,32,32)
-         DoubleConv(256,128)    → (B,128, 32, 32)
-    up2: ConvTranspose2d(128→64)  → (B, 64,64,64) ; cat enc2 → (B,128,64,64)
-         DoubleConv(128, 64)   → (B, 64, 64, 64)
-    up1: ConvTranspose2d(64→32)   → (B, 32,128,128); cat enc1 → (B, 64,128,128)
-         DoubleConv(64, 32)    → (B, 32,128,128)
+    up3: ConvTranspose2d(256->128) -> (B,128,32,32) ; cat enc3 -> (B,256,32,32)
+         DoubleConv(256,128)    -> (B,128, 32, 32)
+    up2: ConvTranspose2d(128->64)  -> (B, 64,64,64) ; cat enc2 -> (B,128,64,64)
+         DoubleConv(128, 64)   -> (B, 64, 64, 64)
+    up1: ConvTranspose2d(64->32)   -> (B, 32,128,128); cat enc1 -> (B, 64,128,128)
+         DoubleConv(64, 32)    -> (B, 32,128,128)
   Output:
-    Conv2d(32, 1, kernel=1) → Sigmoid → (B, 1,128,128)
+    Conv2d(32, 1, kernel=1) -> Sigmoid -> (B, 1,128,128)
 """
 
 import sys
@@ -36,10 +36,10 @@ from src.utils import CFG
 
 
 # ---------------------------------------------------------------------------
-# Building block: two consecutive Conv→BN→ReLU layers
+# Building block: two consecutive Conv->BN->ReLU layers
 # ---------------------------------------------------------------------------
 class DoubleConv(nn.Module):
-    """Two (Conv2d → BatchNorm2d → ReLU) layers back-to-back.
+    """Two (Conv2d -> BatchNorm2d -> ReLU) layers back-to-back.
 
     Using BN keeps gradients stable during training and reduces the need
     for careful weight-initialisation. Padding=1 preserves spatial size.
@@ -67,7 +67,7 @@ class SmallUNet(nn.Module):
     """Lightweight U-Net for 128×128 binary segmentation.
 
     encoder_channels = [3, 32, 64, 128]  (from config)
-    The bottleneck doubles the last encoder channel → 256.
+    The bottleneck doubles the last encoder channel -> 256.
     Skip connections concatenate encoder feature maps into the decoder,
     which is the core idea of U-Net (Ronneberger et al., 2015).
     """
@@ -81,24 +81,24 @@ class SmallUNet(nn.Module):
         c4 = c3 * 2                                 # bottleneck: 256
 
         # ---- Encoder -------------------------------------------------------
-        self.enc1 = DoubleConv(c0, c1)              # → (B, 32, 128, 128)
-        self.enc2 = DoubleConv(c1, c2)              # → (B, 64,  64,  64)
-        self.enc3 = DoubleConv(c2, c3)              # → (B,128,  32,  32)
+        self.enc1 = DoubleConv(c0, c1)              # -> (B, 32, 128, 128)
+        self.enc2 = DoubleConv(c1, c2)              # -> (B, 64,  64,  64)
+        self.enc3 = DoubleConv(c2, c3)              # -> (B,128,  32,  32)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # ---- Bottleneck ----------------------------------------------------
-        self.bottleneck = DoubleConv(c3, c4)        # → (B,256,  16,  16)
+        self.bottleneck = DoubleConv(c3, c4)        # -> (B,256,  16,  16)
 
         # ---- Decoder -------------------------------------------------------
-        # Each stage: upsample (doubles H,W), cat skip → DoubleConv
-        self.up3 = nn.ConvTranspose2d(c4, c3, kernel_size=2, stride=2)   # → (B,128,32,32)
-        self.dec3 = DoubleConv(c3 + c3, c3)        # cat enc3: 128+128=256→128
+        # Each stage: upsample (doubles H,W), cat skip -> DoubleConv
+        self.up3 = nn.ConvTranspose2d(c4, c3, kernel_size=2, stride=2)   # -> (B,128,32,32)
+        self.dec3 = DoubleConv(c3 + c3, c3)        # cat enc3: 128+128=256->128
 
-        self.up2 = nn.ConvTranspose2d(c3, c2, kernel_size=2, stride=2)   # → (B,64,64,64)
-        self.dec2 = DoubleConv(c2 + c2, c2)        # cat enc2:  64+ 64=128→ 64
+        self.up2 = nn.ConvTranspose2d(c3, c2, kernel_size=2, stride=2)   # -> (B,64,64,64)
+        self.dec2 = DoubleConv(c2 + c2, c2)        # cat enc2:  64+ 64=128-> 64
 
-        self.up1 = nn.ConvTranspose2d(c2, c1, kernel_size=2, stride=2)   # → (B,32,128,128)
-        self.dec1 = DoubleConv(c1 + c1, c1)        # cat enc1:  32+ 32= 64→ 32
+        self.up1 = nn.ConvTranspose2d(c2, c1, kernel_size=2, stride=2)   # -> (B,32,128,128)
+        self.dec1 = DoubleConv(c1 + c1, c1)        # cat enc1:  32+ 32= 64-> 32
 
         # ---- Output head ---------------------------------------------------
         # 1×1 conv collapses channel dim to 1; sigmoid maps to [0,1] prob

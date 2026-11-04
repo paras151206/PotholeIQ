@@ -1,20 +1,20 @@
-"""
+﻿"""
 cnn.py — Custom CNN architecture for PotholeIQ (Module M3)
 
 Architecture summary
 --------------------
 Input : (B, 3, 128, 128)
 
-ConvBlock-1 : Conv(3→32,  3×3, pad=1) → BN → ReLU → MaxPool(2)  → (B,  32, 64, 64)
-ConvBlock-2 : Conv(32→64, 3×3, pad=1) → BN → ReLU → MaxPool(2)  → (B,  64, 32, 32)
-ConvBlock-3 : Conv(64→128,3×3, pad=1) → BN → ReLU → MaxPool(2)  → (B, 128, 16, 16)
-ConvBlock-4 : Conv(128→256,3×3,pad=1) → BN → ReLU → MaxPool(2)  → (B, 256,  8,  8)
+ConvBlock-1 : Conv(3->32,  3×3, pad=1) -> BN -> ReLU -> MaxPool(2)  -> (B,  32, 64, 64)
+ConvBlock-2 : Conv(32->64, 3×3, pad=1) -> BN -> ReLU -> MaxPool(2)  -> (B,  64, 32, 32)
+ConvBlock-3 : Conv(64->128,3×3, pad=1) -> BN -> ReLU -> MaxPool(2)  -> (B, 128, 16, 16)
+ConvBlock-4 : Conv(128->256,3×3,pad=1) -> BN -> ReLU -> MaxPool(2)  -> (B, 256,  8,  8)
 
-GlobalAvgPool : AdaptiveAvgPool2d(1)                               → (B, 256,  1,  1)
-Flatten                                                            → (B, 256)
+GlobalAvgPool : AdaptiveAvgPool2d(1)                               -> (B, 256,  1,  1)
+Flatten                                                            -> (B, 256)
 
 Classifier head:
-  Linear(256→128) → ReLU → Dropout(p) → Linear(128→2)            → (B, 2)
+  Linear(256->128) -> ReLU -> Dropout(p) -> Linear(128->2)            -> (B, 2)
 
 Three variants are exposed:
   build_cnn()           — full model (BN + Dropout)
@@ -69,7 +69,7 @@ class ConvBlock(nn.Module):
 
         layers.append(nn.ReLU(inplace=True))
 
-        # MaxPool halves spatial size: H × W → H/2 × W/2
+        # MaxPool halves spatial size: H × W -> H/2 × W/2
         layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
 
         self.block = nn.Sequential(*layers)
@@ -124,7 +124,7 @@ class CustomCNN(nn.Module):
 
         # --- Global Average Pooling ---------------------------------------
         # Collapses 8×8 spatial maps to a single value per channel.
-        # Significantly reduces parameter count vs a Flatten→Dense approach.
+        # Significantly reduces parameter count vs a Flatten->Dense approach.
         self.gap = nn.AdaptiveAvgPool2d(1)
         # Output: (B, 256, 1, 1)
 
@@ -258,4 +258,4 @@ if __name__ == "__main__":
         out = m(dummy)
         assert out.shape == (4, 2), f"[{name}] Bad output shape: {out.shape}"
         total = sum(p.numel() for p in m.parameters())
-        print(f"{name}: input {tuple(dummy.shape)} → output {tuple(out.shape)}  |  params={total:,}")
+        print(f"{name}: input {tuple(dummy.shape)} -> output {tuple(out.shape)}  |  params={total:,}")
