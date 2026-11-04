@@ -1,0 +1,26 @@
+{
+  "full": {
+    "total": 681,
+    "pothole": 329,
+    "normal": 352,
+    "pothole_pct": 48.3
+  },
+  "train": {
+    "total": 476,
+    "pothole": 230,
+    "normal": 246,
+    "pothole_pct": 48.3
+  },
+  "val": {
+    "total": 102,
+    "pothole": 49,
+    "normal": 53,
+    "pothole_pct": 48.0
+  },
+  "test": {
+    "total": 103,
+    "pothole": 50,
+    "normal": 53,
+    "pothole_pct": 48.5
+  }
+}
