@@ -150,11 +150,10 @@ A core contribution of this capstone is candidly documenting where theoretical m
 
 The system is packaged as an interactive Streamlit application (`app/app.py`):
 - **Tab 1 (Detect Image):** Real-time YOLOv8n object detection with confidence slider, severity heuristic, side-by-side view, and structured bounding-box coordinates table.
-- **Tab 2 (Detect Video):** Video processing pipeline capping clips to 15 seconds, rendering live detection counts, FPS throughput, and H.264 browser-compatible video playback via `imageio`.
+- **Tab 2 (Detect Video):** Video processing pipeline capping clips, rendering live detection counts, FPS throughput, optional side-by-side MobileNetV2 Grad-CAM heatmaps, and H.264 browser-compatible video playback via `imageio`.
 - **Tab 3 (Classifier & Grad-CAM):** Binary classification with coarse activation heatmaps and explicit explainability notices.
-- **Tab 4 (Experiments):** Full model comparison tables, ablation metrics, PR curves, and prediction galleries.
-- **Tab 5 (Negative Results & Viva):** Transparent post-mortem of U-Net and Autoencoder failures with 3 essential viva defense Q&As.
-- **Tab 6 (Road Hazard Map):** Interactive demo map with simulated GPS damage points.
+- **Tab 4 (Experiments):** Full model comparison tables, ablation metrics with bar chart, training/val loss curves, bootstrap 95% CIs, ROC curves, confusion matrices, and YOLO PR curves.
+- **Tab 5 (Limitations & Negative Results):** Transparent post-mortem of U-Net and Autoencoder failures and operational boundaries.
 
 ---
 

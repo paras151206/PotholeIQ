@@ -222,11 +222,10 @@ Open **`http://localhost:8501`** in your browser.
 
 #### Dashboard Capabilities:
 - **Tab 1: Detect (Image):** Real-time YOLOv8n detection, confidence slider, per-box severity heuristic, side-by-side original vs annotated views, and structured results table.
-- **Tab 2: Detect (Video):** Upload or choose sample road driving video, process frames with live progress, view frame detections, and play back H.264 annotated video.
+- **Tab 2: Detect (Video):** Upload or choose sample road driving video, process frames with live progress, view frame detections, with optional side-by-side MobileNetV2 Grad-CAM heatmaps, and play back H.264 annotated video.
 - **Tab 3: Classifier & Grad-CAM:** Binary classification with coarse activation heatmaps and explainability disclaimers.
-- **Tab 4: Experiments & Benchmarks:** Interactive model comparison tables, ablation metrics, PR curves, and prediction galleries.
-- **Tab 5: Negative Results & Viva Analysis:** Discarded U-Net and Autoencoder post-mortems with 3 essential viva defense Q&As.
-- **Tab 6: Road Hazard Map:** Interactive geographic telemetry demo using `st.map`.
+- **Tab 4: Experiments & Benchmarks:** Complete model comparison tables (MLP vs CNN vs MobileNetV2 vs YOLOv8n), CNN ablation studies with bar chart, training/validation loss curves, bootstrap 95% CIs, ROC curves, confusion matrices, and YOLO PR curves.
+- **Tab 5: Limitations & Negative Results:** Discarded U-Net and Autoencoder post-mortems and operational constraints.
 
 ---
 

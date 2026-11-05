@@ -325,13 +325,12 @@ where $d = \|e_1 - e_2\|_2$, $y = 0$ for identical potholes, $y = 1$ for differe
 ## M10 — Streamlit Deployment Architecture
 
 ### Architecture Overview
-The production dashboard is organized into 6 interactive tabs:
+The production dashboard is organized into 5 interactive tabs:
 1. **📸 Detect (Image):** Real-time YOLOv8n object detection, confidence slider, severity heuristic, side-by-side original vs annotated views, and structured results table.
-2. **🎥 Detect (Video):** Video inference engine capping clips to 15 seconds, rendering live detections, FPS throughput, and H.264 browser playback via `imageio`.
+2. **🎥 Detect (Video):** Video inference engine capping clips, rendering live detections, FPS throughput, optional side-by-side MobileNetV2 Grad-CAM heatmaps, and H.264 browser playback via `imageio`.
 3. **🔬 Classifier & Grad-CAM:** Binary classification with coarse activation heatmaps and explicit explainability notices.
-4. **📊 Experiments & Benchmarks:** Complete model comparison tables, ablation metrics, PR curves, and prediction galleries.
-5. **⚠️ Negative Results & Viva:** Post-mortems of U-Net and Autoencoder failures with 3 essential viva defense Q&As.
-6. **🗺️ Road Hazard Map:** Interactive municipal telemetry demo using `st.map`.
+4. **📊 Experiments & Benchmarks:** Complete model comparison tables, ablation metrics with bar chart, training/val loss curves, bootstrap 95% CIs, ROC curves, confusion matrices, and YOLO PR curves.
+5. **⚠️ Limitations & Negative Results:** Post-mortems of U-Net and Autoencoder failures and operational boundaries.
 
 ### Viva Q&A
 
