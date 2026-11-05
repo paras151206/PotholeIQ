@@ -1,0 +1,38 @@
+========================================================================
+GRAD-CAM FAILURE ANALYSIS
+========================================================================
+
+Format: Image: <idx> | True: <class> | Pred: <class> | Conf: <conf> | Note: [analysis]
+
+Total misclassified analysed: 8
+  False Positives (normal -> pothole): 5
+  False Negatives (pothole -> normal): 3
+
+------------------------------------------------------------------------
+Per-image breakdown:
+
+Image: 01 | True: normal  | Pred: pothole | Conf: 0.6283 | Note: [error_type=normal -> pothole | borderline texture features triggered pothole response]
+Image: 02 | True: pothole | Pred: normal  | Conf: 0.6026 | Note: [error_type=pothole -> normal | low-contrast pothole — features similar to normal road surface]
+Image: 03 | True: pothole | Pred: normal  | Conf: 0.6110 | Note: [error_type=pothole -> normal | low-contrast pothole — features similar to normal road surface]
+Image: 04 | True: normal  | Pred: pothole | Conf: 0.6988 | Note: [error_type=normal -> pothole | borderline texture features triggered pothole response]
+Image: 05 | True: pothole | Pred: normal  | Conf: 0.5049 | Note: [error_type=pothole -> normal | low-contrast pothole — features similar to normal road surface]
+Image: 06 | True: normal  | Pred: pothole | Conf: 0.9260 | Note: [error_type=normal -> pothole | high activation on road texture/shadow — model confuses dark regions for potholes]
+Image: 07 | True: normal  | Pred: pothole | Conf: 0.7079 | Note: [error_type=normal -> pothole | borderline texture features triggered pothole response]
+Image: 08 | True: normal  | Pred: pothole | Conf: 0.7982 | Note: [error_type=normal -> pothole | borderline texture features triggered pothole response]
+
+------------------------------------------------------------------------
+
+SUMMARY BY FAILURE TYPE:
+
+False Positives (n=5, avg_conf=0.7519):
+  The model activates on road textures, shadows, and low-contrast regions
+  that superficially resemble pothole surfaces. These false alarms tend to
+  occur at high confidence, suggesting the model has learned a shortcut
+  (e.g., dark patches) rather than the true 3-D depression shape.
+  Recommendation: add harder negatives (cracked roads, puddles) to training.
+False Negatives (n=3, avg_conf=0.5728):
+  Potholes missed by the model tend to be small, partially filled, or viewed
+  under glare conditions.  Grad-CAM heatmaps for these cases often show
+  diffuse, low-intensity activation rather than a focused hotspot.
+  Recommendation: oversample small-pothole images; apply stronger
+  brightness/contrast augmentation.
