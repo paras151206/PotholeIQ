@@ -1,0 +1,10 @@
+{
+  "test_loss": 0.368232,
+  "test_dice": 0.905079,
+  "test_iou": 0.827584,
+  "severity_distribution": {
+    "Low": 42,
+    "Medium": 15,
+    "High": 46
+  }
+}
