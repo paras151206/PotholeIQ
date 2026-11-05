@@ -1,0 +1,8 @@
+{
+  "test_contrastive_loss": 0.025823527223710875,
+  "test_pair_accuracy": 0.9611650485436893,
+  "avg_dist_same_pair": 0.221035468943265,
+  "avg_dist_diff_pair": 1.1988310350312128,
+  "margin": 1.0,
+  "note": "Positive pairs are augmented views of same image, NOT real same-pothole-over-time pairs"
+}
