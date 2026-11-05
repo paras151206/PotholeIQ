@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+      normal       0.96      0.98      0.97        53
+     pothole       0.98      0.96      0.97        49
+
+    accuracy                           0.97       102
+   macro avg       0.97      0.97      0.97       102
+weighted avg       0.97      0.97      0.97       102
