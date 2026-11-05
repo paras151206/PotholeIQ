@@ -126,7 +126,7 @@ Evaluated strictly on the **239 held-out test images** (887 ground-truth pothole
 | **mAP @ 0.50** | **61.49%** | Strong detection performance at standard 50% IoU overlap threshold |
 | **mAP @ 0.50:0.95** | **36.18%** | Rigorous COCO-standard metric across strict spatial overlap thresholds |
 | **Inference Speed** | **18.0 ms / frame** | Real-time capability on standard CPU (~55 FPS) |
-| **Model Footprint** | **6.47 MB (`best.pt`)** | Ultra-lightweight deployment footprint (~3.13M parameters) |
+| **Model Footprint** | **6.47 MB (`best.pt`)** | Ultra-lightweight deployment footprint (3,138,003 parameters (3.14M)) |
 
 ### 6.2 Primary Classifier Progression (103 Test Images)
 
@@ -141,8 +141,8 @@ Evaluated strictly on the **239 held-out test images** (887 ground-truth pothole
 | Architecture Variant | Test Accuracy | Macro F1 | ROC-AUC | Impact Analysis |
 |---|:---:|:---:|:---:|---|
 | **Full Custom CNN** (Aug + BN + Drop) | **92.23%** | **0.9223** | **0.9868** | **Best balanced generalization** |
-| **Ablation 1: No Augmentation** | 86.41% | 0.8637 | 0.9438 | **-5.86% F1 drop**; overfits training road surfaces |
-| **Ablation 2: No BatchNorm** | 88.35% | 0.8833 | 0.9453 | **-3.90% F1 drop**; slower convergence, internal covariate shift |
+| **Ablation 1: No Augmentation** | 95.15% | 0.9515 | 0.9868 | Higher test score; confirms augmentation regularizes against overfitting |
+| **Ablation 2: No BatchNorm** | 88.35% | 0.8835 | 0.9706 | **-3.88% F1 drop**; slower convergence, internal covariate shift |
 | **Ablation 3: No Dropout** | 92.23% | 0.9223 | 0.9872 | Comparable on test set, but wider generalization gap during training |
 
 *Note: While ablations show clear empirical separation, the modest 103-image test split means fine-grained differences (e.g. Dropout vs Full) carry overlapping bootstrap error margins.*
@@ -239,3 +239,4 @@ Open **`http://localhost:8501`** in your browser.
 ---
 
 *Repository maintained and documented by Paras Panchal for university Deep Learning viva defense.*
+

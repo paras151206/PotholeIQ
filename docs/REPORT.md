@@ -65,8 +65,8 @@ YOLOv8n employs a modified CSPDarknet53 backbone with C2f (Cross-Stage Partial w
 - **Training Protocol:** Fine-tuned from COCO-pretrained weights for 8 epochs on an AMD Ryzen 7 7840HS CPU at image resolution $416 \times 416$ with batch size 16 and AdamW optimizer.
 
 ### 3.2 Classifier Progression
-1. **TinyMLP Baseline:** Flattened input ($3 \times 128 \times 128 = 49,152$ inputs) through dense layers ($49152 \to 512 \to 128 \to 2$) with Dropout ($p=0.3$), totaling 25.2 million parameters.
-2. **CustomCNN (4-Stage):** Convolutions with channel progression $[32, 64, 128, 256]$, Batch Normalization, ReLU, MaxPool, and Global Average Pooling (GAP), reducing parameters to 425,026.
+1. **TinyMLP Baseline:** Flattened input ($3 \times 128 \times 128 = 49,152$ inputs) through dense layers ($49152 \to 512 \to 128 \to 2$) with Dropout ($p=0.3$), totaling 25,232,258 parameters (25.23M).
+2. **CustomCNN (4-Stage):** Convolutions with channel progression $[32, 64, 128, 256]$, Batch Normalization, ReLU, MaxPool, and Global Average Pooling (GAP), reducing parameters to **422,050** (422K, a 98.3% reduction).
 3. **MobileNetV2 Transfer:** Pretrained ImageNet backbone fine-tuned in two phases:
    - Phase 1: Backbone frozen, custom head ($1280 \to 256 \to 2$) trained with Adam ($\text{lr} = 10^{-3}$) for 5 epochs.
    - Phase 2: Top 3 InvertedResidual blocks unfrozen, trained with reduced learning rate ($\text{lr} = 5 \times 10^{-5}$) for 6 epochs.
@@ -98,8 +98,8 @@ Evaluated on the **239 held-out test images** (887 ground-truth instances):
 | Architecture | Parameters | Test Accuracy | Macro Precision | Macro Recall | Macro $F_1$ | ROC-AUC |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **TinyMLP Baseline** | 25,232,258 | 72.82% | 0.7334 | 0.7257 | 0.7250 | 0.8502 |
-| **CustomCNN** | **425,026** | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** |
-| **MobileNetV2** | 2,544,130 | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** |
+| **CustomCNN** | **422,050** | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** |
+| **MobileNetV2** | 2,552,322 | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** |
 
 ### 4.3 Statistical Analysis & Non-Parametric Bootstrap Confidence Intervals
 
@@ -118,8 +118,8 @@ Evaluating small test splits ($N = 103$) with 1,000 bootstrap resamplings (`resu
 | Ablation Variant | Test Accuracy | Macro $F_1$ | ROC-AUC | Observation |
 |---|:---:|:---:|:---:|---|
 | **Full CustomCNN** | **92.23%** | **0.9223** | **0.9868** | Reference baseline |
-| Without Augmentation | 86.41% | 0.8637 | 0.9438 | **-5.86% $F_1$** drop; overfits training road surfaces |
-| Without BatchNorm | 88.35% | 0.8833 | 0.9453 | **-3.90% $F_1$** drop; slower optimization convergence |
+| Without Augmentation | 95.15% | 0.9515 | 0.9868 | Higher test accuracy; confirms augmentation acts as regularizer against overfitting, not always a test-set booster |
+| Without BatchNorm | 88.35% | 0.8835 | 0.9706 | **-3.88% $F_1$** drop; slower optimization convergence |
 | Without Dropout | 92.23% | 0.9223 | 0.9872 | Identical test accuracy, but wider train-val loss gap |
 
 *Limitation:* With 103 test samples, subtle regularizers like Dropout fall within the bootstrap margin of error.

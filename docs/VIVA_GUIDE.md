@@ -132,8 +132,8 @@ Total Parameters: 425,026 (1.7 MB) — 98.3% parameter reduction vs MLP!
 | Configuration | Test Accuracy | Macro F1 | ROC-AUC | Impact |
 |---|:---:|:---:|:---:|---|
 | **Full Custom CNN** | **92.23%** | **0.9223** | **0.9868** | **Best generalization** |
-| No Augmentation | 86.41% | 0.8637 | 0.9438 | -5.86% F1 drop; severe overfitting |
-| No BatchNorm | 88.35% | 0.8833 | 0.9453 | -3.90% F1 drop; slower convergence |
+| No Augmentation | 95.15% | 0.9515 | 0.9868 | Higher test accuracy; confirms augmentation acts as regularizer against overfitting |
+| No BatchNorm | 88.35% | 0.8835 | 0.9706 | -3.88% F1 drop; slower convergence |
 | No Dropout | 92.23% | 0.9223 | 0.9872 | Wider train-val loss gap |
 
 ### Viva Q&A

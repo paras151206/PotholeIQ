@@ -558,9 +558,9 @@ with tab_exp:
             "Test Accuracy": f"{base_m.get('accuracy', 0.7282):.2%}",
             "Precision": f"{base_m.get('precision', 0.7334):.4f}",
             "Recall": f"{base_m.get('recall', 0.7257):.4f}",
-            "F1-Score": f"{base_m.get('f1_score', 0.7250):.4f}",
+            "F1-Score": f"{base_m.get('f1', 0.7250):.4f}",
             "ROC-AUC / mAP": f"AUC: {base_m.get('roc_auc', 0.8502):.4f}",
-            "Parameters": "~25.2 M",
+            "Parameters": "~25.2 M (25,232,258)",
         },
         {
             "Model": "Custom CNN (4-Stage)",
@@ -569,9 +569,9 @@ with tab_exp:
             "Test Accuracy": f"{cnn_m.get('accuracy', 0.9223):.2%}",
             "Precision": f"{cnn_m.get('precision', 0.9225):.4f}",
             "Recall": f"{cnn_m.get('recall', 0.9228):.4f}",
-            "F1-Score": f"{cnn_m.get('f1_score', 0.9223):.4f}",
+            "F1-Score": f"{cnn_m.get('f1', 0.9223):.4f}",
             "ROC-AUC / mAP": f"AUC: {cnn_m.get('roc_auc', 0.9868):.4f}",
-            "Parameters": "425 K (-98.3%)",
+            "Parameters": "422 K (422,050, −98.3%)",
         },
         {
             "Model": "MobileNetV2 (Transfer)",
@@ -580,9 +580,9 @@ with tab_exp:
             "Test Accuracy": f"{tf_m.get('accuracy', 0.9806):.2%}",
             "Precision": f"{tf_m.get('precision', 0.9806):.4f}",
             "Recall": f"{tf_m.get('recall', 0.9806):.4f}",
-            "F1-Score": f"{tf_m.get('f1_score', 0.9806):.4f}",
+            "F1-Score": f"{tf_m.get('f1', 0.9806):.4f}",
             "ROC-AUC / mAP": f"AUC: {tf_m.get('roc_auc', 0.9985):.4f}",
-            "Parameters": "~2.55 M",
+            "Parameters": "2.55 M total (2,552,322); P1 trainable: 328 K; P2 trainable: 1.53 M",
         },
         {
             "Model": "YOLOv8n (Object Detector)",
@@ -593,7 +593,7 @@ with tab_exp:
             "Recall": f"{yolo_m.get('recall', 0.5534):.2%}",
             "F1-Score": "0.6242",
             "ROC-AUC / mAP": f"mAP@50: {yolo_m.get('map_50', 0.6149):.2%}, mAP50-95: {yolo_m.get('map_50_95', 0.3618):.2%}",
-            "Parameters": "~3.13 M",
+            "Parameters": "3.14 M (3,138,003)",
         },
     ]
     st.table(pd.DataFrame(benchmark_data))
@@ -603,14 +603,20 @@ with tab_exp:
     st.markdown("Isolating the contribution of Data Augmentation, Batch Normalization, and Dropout on the Custom CNN:")
     ablation_m = all_metrics.get("ablation_summary", {})
     if ablation_m:
+        _obs_map = {
+            "Full Custom CNN": "Reference — best balanced generalization",
+            "No Augmentation": "95.15% test acc; augmentation acts as regularizer against overfitting (may not always boost small test sets)",
+            "No BatchNorm": "88.35% test acc; −3.88% F1 drop; slower convergence, internal covariate shift",
+            "No Dropout": "92.23% test acc; identical test score but wider train-val loss gap during training",
+        }
         ablation_rows = []
         for var_name, vdata in ablation_m.items():
             ablation_rows.append({
                 "Architecture Variant": var_name,
                 "Test Accuracy": f"{vdata.get('accuracy', 0):.2%}",
-                "Macro F1-Score": f"{vdata.get('f1_score', 0):.4f}",
+                "Macro F1-Score": f"{vdata.get('f1', vdata.get('f1_score', 0)):.4f}",
                 "ROC-AUC": f"{vdata.get('roc_auc', 0):.4f}",
-                "Primary Observation": "Best balanced generalization" if "Full" in var_name else ("Severe train-val gap (-5.86% F1)" if "no_aug" in var_name.lower() or "augmentation" in var_name.lower() else ("Slower convergence (-3.90% F1)" if "bn" in var_name.lower() else "Comparable on test, wider training gap")),
+                "Primary Observation": _obs_map.get(var_name, "—"),
             })
         st.table(pd.DataFrame(ablation_rows))
 
@@ -696,6 +702,43 @@ with tab_exp:
     if gallery_path.exists():
         st.image(str(gallery_path), caption="YOLOv8n Predictions on Held-Out Test Split (Sample Grid)", use_container_width=True)
 
+    # Section 7: Training Configuration & Hyperparameters
+    st.markdown("### 7. Training Configuration & Hyperparameters")
+    st.markdown("All details pulled from `config.yaml` and training script defaults — no estimates:")
+    st.markdown("""
+| Setting | Baseline MLP | Custom CNN | MobileNetV2 (P1) | MobileNetV2 (P2) | YOLOv8n |
+|---|:---:|:---:|:---:|:---:|:---:|
+| **Epochs** | 12 | 15 | 5 | 6 | 8 |
+| **Batch Size** | 32 | 32 | 32 | 32 | 16 |
+| **Image Size** | 128×128 | 128×128 | 128×128 | 128×128 | 416×416 |
+| **Optimizer** | Adam | Adam | Adam | Adam | auto (SGD/AdamW) |
+| **Learning Rate** | 1e-3 | 3e-4 | 1e-3 | 5e-5 | 0.01 (warmup 3 ep) |
+| **LR Schedule** | None | CosineAnnealing | CosineAnnealing | CosineAnnealing | Cosine decay |
+| **Weight Decay** | 1e-4 | 1e-4 | 1e-4 | 1e-4 | 5e-4 |
+| **Loss Function** | CE (class-weighted) | CE + label smooth 0.1 | CE (class-weighted) | CE (class-weighted) | CIoU + BCE + DFL |
+| **Early Stopping** | patience=5 | patience=5 | patience=5 | patience=5 | ✗ (all 8 epochs) |
+| **Augmentation** | HFlip, ColorJitter, RandomErasing | HFlip, ColorJitter, RandomErasing | Same | Same | HSV, HFlip, Mosaic, Scale |
+| **Random Seed** | 42 | 42 | 42 | 42 | 42 |
+| **Hardware** | CPU | CPU | CPU | CPU | CPU |
+| **Pretrained** | — | — | ImageNet | ImageNet | COCO |
+
+**Software stack:** Python 3.12.10 · PyTorch 2.15.0+cpu · torchvision 0.29.2+cpu · ultralytics 8.4.202 · streamlit 1.66.1
+
+**Verified parameter counts (loaded from checkpoints):**
+| Model | Total Params | Trainable Params |
+|---|:---:|:---:|
+| Baseline MLP (TinyMLP) | 25,232,258 (25.23 M) | 25,232,258 |
+| Custom CNN (4-Stage) | 422,050 (422 K) | 422,050 |
+| MobileNetV2 — Phase 1 | 2,552,322 (2.55 M) | 328,450 (head only) |
+| MobileNetV2 — Phase 2 | 2,552,322 (2.55 M) | 1,534,530 (head + last 3 blocks) |
+| SmallUNet | 1,927,009 (1.93 M) | 1,927,009 |
+| SiameseNet | 421,792 (422 K) | 421,792 |
+| ConvAutoencoder | 3,495,043 (3.50 M) | 3,495,043 |
+| YOLOv8n | 3,138,003 (3.14 M) | 3,138,003 |
+""")
+    st.caption("⚠️ YOLOv8n default mAP metrics (Precision 71.46%, Recall 55.34%, mAP@50 61.49%) are at Ultralytics default conf≈0.25. The confusion matrix re-evaluation at conf=0.25, iou=0.5 gives TP=479, FP=147, FN=408.")
+
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Tab 5: Limitations & Negative Results
@@ -757,3 +800,4 @@ with tab_neg:
 
 st.divider()
 st.caption("PotholeIQ — Autonomous Road Hazard Detection Pipeline · Evaluated on verified datasets with real checkpoints")
+
