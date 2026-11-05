@@ -347,7 +347,7 @@ def overfit_sanity_check(train_ds, val_loader, ckpt_dir, plots_dir):
     if final_acc >= 0.95:
         print(f"\n  OK Sanity check PASSED (final train acc = {final_acc:.4f})")
     else:
-        print(f"\n  ✗ Sanity check WARNING — train acc only {final_acc:.4f} (expected ≥ 0.95)")
+        print(f"\n  [WARNING] Sanity check: train acc = {final_acc:.4f} (expected >= 0.95)")
         print("    Check data loading and model forward pass.")
 
     # Save the sanity-check curves for the report

@@ -49,8 +49,8 @@ cnn:
 # ── Transfer Learning (M4) ───────────────────────────────────────────────────
 transfer:
   backbone: "mobilenet_v2"      # "mobilenet_v2" | "resnet18"
-  phase1_epochs: 8              # frozen backbone
-  phase2_epochs: 10             # unfreeze last N blocks
+  phase1_epochs: 5              # frozen backbone (fast CPU budget)
+  phase2_epochs: 6              # unfreeze last N blocks
   unfreeze_blocks: 3
   phase1_lr: 0.001
   phase2_lr: 0.00005
@@ -61,7 +61,7 @@ unet:
   encoder_channels: [3, 32, 64, 128]  # lightweight for 128x128 input
   dice_weight: 0.5              # combined loss = dice_w*Dice + (1-dice_w)*BCE
   lr: 0.0003
-  epochs: 15
+  epochs: 6
   # Severity thresholds (mask_area / image_area)
   severity_thresholds:
     low_max: 0.05               # < 5 % → Low
@@ -73,13 +73,13 @@ siamese:
   embedding_dim: 128
   margin: 1.0                   # contrastive loss margin
   lr: 0.0003
-  epochs: 15
+  epochs: 6
 
 # ── Autoencoder (M8) ─────────────────────────────────────────────────────────
 autoencoder:
   latent_dim: 64
   lr: 0.0003
-  epochs: 20
+  epochs: 8
   anomaly_threshold: null       # set after validation; null means auto-select
 
 # ── Augmentation ─────────────────────────────────────────────────────────────
