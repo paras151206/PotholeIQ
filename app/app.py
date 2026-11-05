@@ -134,7 +134,9 @@ def run_gradcam(model, img_tensor: torch.Tensor, target_class: int) -> np.ndarra
     target_layer = None
     if hasattr(model, "conv_blocks"):          # CustomCNN
         target_layer = model.conv_blocks[-1]
-    elif hasattr(model, "backbone"):           # TransferModel
+    elif hasattr(model, "features"):           # TransferModel
+        target_layer = model.features[-1]
+    elif hasattr(model, "backbone"):           # Alternate backbone attribute
         target_layer = model.backbone.features[-1]
     if target_layer is None:
         return None
@@ -255,11 +257,12 @@ with tab_xai:
                 heatmap = run_gradcam(clf, img_tensor, target)
                 if heatmap is not None:
                     orig_np = np.array(pil_img.resize((W, H)))
-                    # Apply jet colormap and blend
-                    heatmap_uint8 = (heatmap * 255).astype(np.uint8)
-                    heatmap_color = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
-                    heatmap_rgb   = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
-                    overlay       = cv2.addWeighted(orig_np, 0.5, heatmap_rgb, 0.5, 0)
+                    # Resize heatmap to match image resolution, apply jet colormap and blend
+                    heatmap_resized = cv2.resize(heatmap, (W, H))
+                    heatmap_uint8   = (heatmap_resized * 255).astype(np.uint8)
+                    heatmap_color   = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
+                    heatmap_rgb     = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
+                    overlay         = cv2.addWeighted(orig_np, 0.5, heatmap_rgb, 0.5, 0)
 
                     col_a, col_b = st.columns(2)
                     col_a.image(orig_np,  caption="Original", use_container_width=True)
