@@ -194,7 +194,7 @@ iou_threshold = st.sidebar.slider("NMS IoU Threshold", 0.10, 0.90, 0.45, 0.05, h
 st.sidebar.divider()
 st.sidebar.subheader("Severity Heuristic (Area Ratio)")
 st.sidebar.markdown(
-    """
+    r"""
     - 🟢 **Low:** $< 2\%$ of image area
     - 🟡 **Medium:** $2\% - 8\%$ of image area
     - 🔴 **High:** $> 8\%$ of image area
@@ -613,7 +613,7 @@ with tab_neg:
     st.divider()
     st.markdown("### 🎓 Key Viva Questions & Recommended Answers")
     st.markdown(
-        """
+        r"""
         **Q1: Why did you transition from U-Net segmentation to YOLOv8n object detection?**  
         *Answer:* The available annotations were bounding boxes. Training a segmentation network on rectangular masks 
         causes it to predict bounding rectangles rather than morphological road contours. Object detection is the 
