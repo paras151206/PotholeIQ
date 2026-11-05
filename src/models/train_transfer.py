@@ -1,4 +1,4 @@
-﻿"""
+"""
 train_transfer.py — Two-phase MobileNetV2 fine-tuning script (Module M4)
 
 Usage:
@@ -231,7 +231,7 @@ def main():
     plot_confusion_matrix(
         test_metrics["confusion_matrix"],
         class_names=["normal", "pothole"],
-        title="Transfer Learning — Confusion Matrix",
+        title="Transfer Learning - Confusion Matrix",
         save_path=PLOTS_DIR / "transfer_confusion_matrix.png",
     )
 
