@@ -1,88 +1,75 @@
-# =============================================================================
-# PotholeIQ — Central Configuration
-# Every hyperparameter lives here. Code reads this file; nothing is hard-coded.
-# =============================================================================
-
-# ── Reproducibility ───────────────────────────────────────────────────────────
 seed: 42
-
-# ── Paths (relative to repo root) ────────────────────────────────────────────
 paths:
-  data_raw:        "data/raw"
-  data_processed:  "data/processed"
-  splits_dir:      "data/splits"
-  results_dir:     "results"
-  plots_dir:       "results/plots"
-  metrics_dir:     "results/metrics"
-  checkpoints_dir: "results/checkpoints"
-
-# ── Data ──────────────────────────────────────────────────────────────────────
+  data_raw: data/raw
+  data_processed: data/processed
+  splits_dir: data/splits
+  results_dir: results
+  plots_dir: results/plots
+  metrics_dir: results/metrics
+  checkpoints_dir: results/checkpoints
 data:
-  image_size: [128, 128]      # (H, W) — reduced for fast training on free GPU
-  split_ratios: [0.70, 0.15, 0.15]   # train / val / test
-  num_workers: 0              # 0 is safest on Windows; increase if on Linux/Colab
-  pin_memory: false           # set true only on CUDA with num_workers > 0
-
-# ── Training (shared defaults) ────────────────────────────────────────────────
+  image_size:
+  - 128
+  - 128
+  split_ratios:
+  - 0.7
+  - 0.15
+  - 0.15
+  num_workers: 0
+  pin_memory: false
 train:
   batch_size: 32
-  epochs: 15                  # capped for free-GPU budget; override per model
-  early_stopping_patience: 5  # stop if val loss doesn't improve for N epochs
-
-# ── Baseline (tiny MLP) ───────────────────────────────────────────────────────
+  epochs: 15
+  early_stopping_patience: 5
 baseline:
-  hidden_dims: [512, 128]     # MLP hidden layer sizes after flattening
+  hidden_dims:
+  - 512
+  - 128
   lr: 0.001
   weight_decay: 0.0001
   epochs: 12
-
-# ── Custom CNN (M3) ───────────────────────────────────────────────────────────
 cnn:
-  channels: [32, 64, 128, 256]  # output channels of each conv block
+  channels:
+  - 32
+  - 64
+  - 128
+  - 256
   dropout: 0.4
   lr: 0.0003
   weight_decay: 0.0001
   label_smoothing: 0.1
-  scheduler: "cosine"           # "cosine" | "step" | "none"
+  scheduler: cosine
   epochs: 15
-
-# ── Transfer Learning (M4) ───────────────────────────────────────────────────
 transfer:
-  backbone: "mobilenet_v2"      # "mobilenet_v2" | "resnet18"
-  phase1_epochs: 5              # frozen backbone (fast CPU budget)
-  phase2_epochs: 6              # unfreeze last N blocks
+  backbone: mobilenet_v2
+  phase1_epochs: 5
+  phase2_epochs: 6
   unfreeze_blocks: 3
   phase1_lr: 0.001
-  phase2_lr: 0.00005
+  phase2_lr: 5.0e-05
   dropout: 0.3
-
-# ── Segmentation U-Net (M5) ──────────────────────────────────────────────────
 unet:
-  encoder_channels: [3, 32, 64, 128]  # lightweight for 128x128 input
-  dice_weight: 0.5              # combined loss = dice_w*Dice + (1-dice_w)*BCE
+  encoder_channels:
+  - 3
+  - 32
+  - 64
+  - 128
+  dice_weight: 0.5
   lr: 0.0003
   epochs: 6
-  # Severity thresholds (mask_area / image_area)
   severity_thresholds:
-    low_max: 0.05               # < 5 % → Low
-    medium_max: 0.20            # 5–20 % → Medium
-                                # > 20 % → High
-
-# ── Siamese Network (M7) ─────────────────────────────────────────────────────
+    low_max: 0.05
+    medium_max: 0.2
 siamese:
   embedding_dim: 128
-  margin: 1.0                   # contrastive loss margin
+  margin: 1.0
   lr: 0.0003
   epochs: 6
-
-# ── Autoencoder (M8) ─────────────────────────────────────────────────────────
 autoencoder:
   latent_dim: 64
   lr: 0.0003
   epochs: 8
-  anomaly_threshold: null       # set after validation; null means auto-select
-
-# ── Augmentation ─────────────────────────────────────────────────────────────
+  anomaly_threshold: 0.1797645539045334
 augmentation:
   horizontal_flip: true
   vertical_flip: false
@@ -93,6 +80,11 @@ augmentation:
     saturation: 0.2
     hue: 0.05
   random_erasing: true
-  normalize_mean: [0.485, 0.456, 0.406]  # ImageNet stats (also used for custom)
-  normalize_std:  [0.229, 0.224, 0.225]
-
+  normalize_mean:
+  - 0.485
+  - 0.456
+  - 0.406
+  normalize_std:
+  - 0.229
+  - 0.224
+  - 0.225

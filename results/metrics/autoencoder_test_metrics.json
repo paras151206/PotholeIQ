@@ -1,0 +1,11 @@
+{
+  "roc_auc": 0.3007547169811321,
+  "threshold": 0.1797645539045334,
+  "threshold_note": "Selected to maximise F1 on val set (50 candidates)",
+  "accuracy": 0.4854368932038835,
+  "precision": 0.4854368932038835,
+  "recall": 1.0,
+  "f1": 0.6535947712418301,
+  "n_normal_test": 53,
+  "n_pothole_test": 50
+}
