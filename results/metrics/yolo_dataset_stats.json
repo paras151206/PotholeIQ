@@ -1,0 +1,17 @@
+{
+  "dataset_source": "anggadwisunarto/potholes-detection-yolov8",
+  "total_unique_images": 1590,
+  "duplicates_removed": 387,
+  "total_bounding_boxes": 5684,
+  "avg_boxes_per_image": 3.57,
+  "splits": {
+    "train": 1113,
+    "val": 238,
+    "test": 239
+  },
+  "boxes_by_split": {
+    "train": 3972,
+    "val": 825,
+    "test": 887
+  }
+}

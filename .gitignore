@@ -1,16 +1,16 @@
 # ── Datasets & large binary files ──────────────────────────────────────────
-data/raw/
-data/processed/
-data/splits/*.csv   # generated at runtime; re-create with src/data/split.py
+/data/
 *.zip
 *.tar.gz
 *.tar
 *.h5
 *.hdf5
 
-# ── Model weights (too large for git; upload to Drive/HuggingFace Hub) ──────
+# ── Model weights (exclude large ones, allow small best detector checkpoint) ─
 results/checkpoints/*.pth
 results/checkpoints/*.pt
+!results/checkpoints/best.pt
+!results/checkpoints/yolov8n_best.pt
 *.ckpt
 
 # ── Python ──────────────────────────────────────────────────────────────────
