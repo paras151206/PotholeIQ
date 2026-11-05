@@ -1,4 +1,4 @@
-﻿"""
+"""
 cnn.py — Custom CNN architecture for PotholeIQ (Module M3)
 
 Architecture summary
@@ -140,6 +140,11 @@ class CustomCNN(nn.Module):
 
         # Weight initialisation
         self._init_weights()
+
+    @property
+    def conv_blocks(self):
+        """Alias for features so gradcam and siamese can access blocks by name."""
+        return self.features
 
     # ------------------------------------------------------------------
     def _init_weights(self):
