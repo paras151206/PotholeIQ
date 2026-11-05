@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/data/dataset.py
 --------------------
 PyTorch Dataset classes for PotholeIQ.
@@ -236,12 +236,23 @@ class PotholeSegDataset(Dataset):
         # Build mask
         mask = np.zeros((H, W), dtype=np.float32)
         bbox_path = str(row.get("bbox_path", "")).strip()
+        label = int(row.get("label", 0))
+
         if bbox_path and Path(bbox_path).exists():
+            # Real YOLO bbox annotations exist — rasterise them
             with open(bbox_path) as f:
                 for line in f:
                     if line.strip():
                         m = _yolo_to_mask(line, orig_w, orig_h, H, W)
                         mask = np.maximum(mask, m)   # union of all bbox masks
+        elif label == 1:
+            # No bbox file for a pothole image — generate a synthetic center-crop mask.
+            # This is a KNOWN LIMITATION (no real pixel annotations in this dataset).
+            # The center 50% rectangle is a reasonable prior: potholes usually
+            # appear in the center / lower half of road images.
+            # This gives the U-Net a training signal; expect low IoU/Dice.
+            h4, w4 = H // 4, W // 4
+            mask[h4 : 3 * h4, w4 : 3 * w4] = 1.0
 
         if self.img_transform:
             img = self.img_transform(img)

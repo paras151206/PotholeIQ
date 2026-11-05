@@ -49,12 +49,12 @@ print("="*65 + "\n")
 
 for name, script in STEPS:
     script_path = ROOT / script
-    print(f"\n{'─'*65}")
+    print(f"\n{'-'*65}")
     print(f"  RUNNING: {name}  ({script})")
-    print(f"{'─'*65}")
+    print(f"{'-'*65}")
 
     if not script_path.exists():
-        print(f"  ⚠ Script not found: {script_path}")
+        print(f"  [SKIPPED] Script not found: {script_path}")
         results.append((name, "SKIPPED", 0))
         continue
 
@@ -66,9 +66,9 @@ for name, script in STEPS:
     elapsed = time.time() - start
 
     if ret.returncode == 0:
-        status = "✅ OK"
+        status = "OK"
     else:
-        status = f"❌ FAILED (exit {ret.returncode})"
+        status = f"FAILED (exit {ret.returncode})"
 
     results.append((name, status, elapsed))
     print(f"\n  {status} in {elapsed:.1f}s")
@@ -78,16 +78,16 @@ print("\n\n" + "="*65)
 print("  PIPELINE SUMMARY")
 print("="*65)
 print(f"  {'Step':<30} {'Status':<20} {'Time':>8}")
-print(f"  {'─'*30} {'─'*20} {'─'*8}")
+print(f"  {'-'*30} {'-'*20} {'-'*8}")
 for name, status, t in results:
     print(f"  {name:<30} {status:<20} {t:>7.1f}s")
 print("="*65 + "\n")
 
 failed = [r for r in results if "FAILED" in r[1]]
 if failed:
-    print(f"  ⚠ {len(failed)} step(s) failed. Check output above.")
+    print(f"  WARNING: {len(failed)} step(s) failed. Check output above.")
     sys.exit(1)
 else:
-    print("  ✅ All steps completed successfully.")
+    print("  All steps completed successfully.")
     print("  Run:  streamlit run app/app.py\n")
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/utils/metrics.py
 ---------------------
 Reusable metric helpers used across classifiers, segmentation, and
@@ -31,6 +31,7 @@ def classification_metrics(
     y_pred: Sequence[int],
     y_prob: Sequence[float] | None = None,
     class_names: list[str] | None = None,
+    model_name: str | None = None,   # optional label stored in the metrics dict
 ) -> dict:
     """
     Compute accuracy, precision, recall, F1, confusion matrix, and
@@ -52,6 +53,7 @@ def classification_metrics(
     y_pred = np.asarray(y_pred)
 
     metrics = {
+        "model_name": model_name,   # may be None; useful when comparing multiple runs
         "accuracy":  float(accuracy_score(y_true, y_pred)),
         "precision": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
         "recall":    float(recall_score(y_true, y_pred, average="macro", zero_division=0)),

@@ -1,4 +1,4 @@
-﻿"""
+"""
 train_cnn.py — Training script for CustomCNN + ablation studies (Module M3)
 
 Usage:
@@ -259,7 +259,12 @@ def single_run(
 
     # --- Save training curves ---------------------------------------------
     plot_path = plots_dir / f"{run_name}_training.png"
-    plot_training_curves(history, model_name=run_name, save_path=plot_path)
+    plot_training_curves(
+        history["train_loss"], history["val_loss"],
+        history["train_acc"],  history["val_acc"],
+        title=f"{run_name} Training Curves",
+        save_path=plot_path,
+    )
     print(f"\n[{run_name}] Training curves -> {plot_path}")
 
     # --- Test evaluation with best checkpoint -----------------------------
@@ -281,9 +286,9 @@ def single_run(
     # --- Confusion matrix -------------------------------------------------
     cm_path = plots_dir / f"{run_name}_confusion_matrix.png"
     plot_confusion_matrix(
-        y_true=test_labels_list,
-        y_pred=test_preds,
-        model_name=run_name,
+        cm=test_metrics["confusion_matrix"],
+        class_names=["normal", "pothole"],
+        title=f"{run_name} Confusion Matrix",
         save_path=cm_path,
     )
     print(f"[{run_name}] Confusion mat  -> {cm_path}")
@@ -348,11 +353,9 @@ def overfit_sanity_check(train_ds, val_loader, ckpt_dir, plots_dir):
     # Save the sanity-check curves for the report
     sc_plot = plots_dir / "cnn_overfit_sanity.png"
     plot_training_curves(
-        {"train_loss": history["train_loss"],
-         "val_loss":   history["train_loss"],    # dummy: same line
-         "train_acc":  history["train_acc"],
-         "val_acc":    history["train_acc"]},    # dummy
-        model_name="cnn_overfit_sanity",
+        history["train_loss"], history["train_loss"],   # val = train (no val set)
+        history["train_acc"],  history["train_acc"],
+        title="CNN Overfit Sanity Check",
         save_path=sc_plot,
     )
     print(f"  Sanity-check plot -> {sc_plot}\n")
@@ -388,10 +391,10 @@ def main():
             sys.exit(1)
 
     # --- Transforms ----------------------------------------------------------
-    train_tf_aug = get_transforms(mode="train")   # augmented  (flips, colour jitter, etc.)
-    train_tf_val = get_transforms(mode="val")     # plain      (resize + normalise only)
-    val_tf       = get_transforms(mode="val")
-    test_tf      = get_transforms(mode="val")
+    train_tf_aug = get_transforms("train")   # augmented  (flips, colour jitter, etc.)
+    train_tf_val = get_transforms("val")     # plain      (resize + normalise only)
+    val_tf       = get_transforms("val")
+    test_tf      = get_transforms("val")
 
     # --- Main loaders (augmented train) -------------------------------------
     (train_ds, val_ds, test_ds,

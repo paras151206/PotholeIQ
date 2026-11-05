@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/data/split.py
 ------------------
 Stratified train/val/test split for the PotholeIQ dataset.

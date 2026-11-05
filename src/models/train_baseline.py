@@ -1,4 +1,4 @@
-﻿"""
+"""
 train_baseline.py — Training script for the TinyMLP baseline model (Module M2)
 
 Usage:
@@ -213,9 +213,9 @@ def main():
     # Baseline uses non-augmented transforms for both train and val.
     # The MLP has no spatial inductive bias, so heavy augmentation
     # would not help but could add noise.
-    train_tf = get_transforms(mode="val")   # resize + normalise only
-    val_tf   = get_transforms(mode="val")
-    test_tf  = get_transforms(mode="val")
+    train_tf = get_transforms("val")   # resize + normalise only
+    val_tf   = get_transforms("val")
+    test_tf  = get_transforms("val")
 
     # --- Datasets & DataLoaders ----------------------------------------------
     train_ds = PotholeDataset(train_csv, transform=train_tf)
@@ -290,7 +290,12 @@ def main():
 
     # --- Save training curves ------------------------------------------------
     plot_path = plots_dir / f"{MODEL_NAME}_training.png"
-    plot_training_curves(history, model_name=MODEL_NAME, save_path=plot_path)
+    plot_training_curves(
+        history["train_loss"], history["val_loss"],
+        history["train_acc"],  history["val_acc"],
+        title=f"{MODEL_NAME.upper()} Training Curves",
+        save_path=plot_path,
+    )
     print(f"\nTraining curves saved -> {plot_path}")
 
     # --- Test evaluation (run exactly ONCE with best checkpoint) -------------
@@ -316,9 +321,9 @@ def main():
     # --- Confusion matrix ----------------------------------------------------
     cm_path = plots_dir / f"{MODEL_NAME}_confusion_matrix.png"
     plot_confusion_matrix(
-        y_true=test_labels,
-        y_pred=test_preds,
-        model_name=MODEL_NAME,
+        cm=test_metrics["confusion_matrix"],
+        class_names=["normal", "pothole"],
+        title=f"{MODEL_NAME.upper()} Confusion Matrix",
         save_path=cm_path,
     )
     print(f"Confusion matrix    -> {cm_path}")

@@ -1,4 +1,4 @@
-﻿"""
+"""
 src/models/train_unet.py
 ========================
 Training script for the SmallUNet segmentation model.
@@ -102,13 +102,23 @@ def _ensure_seg_csv(split: str) -> Path:
 # ---------------------------------------------------------------------------
 # Loss functions
 # ---------------------------------------------------------------------------
+def _dice_coefficient_tensor(pred: torch.Tensor, target: torch.Tensor, smooth: float = 1.0) -> torch.Tensor:
+    """Differentiable Dice coefficient for tensor inputs.
+    Both pred and target must be float tensors of the same shape.
+    """
+    pred_flat   = pred.view(-1)
+    target_flat = target.view(-1)
+    intersection = (pred_flat * target_flat).sum()
+    return (2.0 * intersection + smooth) / (pred_flat.sum() + target_flat.sum() + smooth)
+
+
 def dice_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Differentiable Dice loss.  1 – Dice_coefficient.
+    """Differentiable Dice loss.  1 - Dice_coefficient.
 
     Smooth=1 is added to numerator and denominator to avoid division by zero
     when both pred and target are all-zero (background-only patches).
     """
-    return 1.0 - dice_coefficient(pred, target)
+    return 1.0 - _dice_coefficient_tensor(pred, target)
 
 
 def combined_loss(
@@ -154,8 +164,11 @@ def run_epoch(model, loader, optimiser, training: bool):
             # Threshold at 0.5 for discrete metric computation
             binary = (preds > 0.5).float()
             total_loss += loss.item() * imgs.size(0)
-            total_dice += dice_coefficient(binary, masks).item() * imgs.size(0)
-            total_iou  += iou_score(binary, masks).item() * imgs.size(0)
+            # Convert to numpy for metric helpers (which expect numpy arrays)
+            binary_np = binary.cpu().numpy()
+            masks_np  = masks.cpu().numpy()
+            total_dice += dice_coefficient(binary_np, masks_np) * imgs.size(0)
+            total_iou  += iou_score(binary_np, masks_np) * imgs.size(0)
             n += imgs.size(0)
 
     return total_loss / n, total_dice / n, total_iou / n
@@ -263,7 +276,7 @@ def main():
     model     = build_unet().to(DEVICE)
     optimiser = torch.optim.Adam(model.parameters(), lr=CFG.unet.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimiser, mode="min", factor=0.5, patience=3, verbose=True
+        optimiser, mode="min", factor=0.5, patience=3
     )
 
     # ---- Training loop with early stopping ---------------------------------
@@ -333,8 +346,9 @@ def main():
 
     # ---- Training curves ---------------------------------------------------
     plot_training_curves(
-        history,
-        title="U-Net Training Curves",
+        history["train_loss"], history["val_loss"],
+        history["train_dice"], history["val_dice"],
+        title="U-Net Training Curves (Loss / Dice)",
         save_path=str(PLOTS_DIR / "unet_training.png"),
     )
     print(f"[INFO] Training plot saved -> {PLOTS_DIR / 'unet_training.png'}")
