@@ -48,6 +48,8 @@ desktop.ini
 *.swo
 
 # ── Logs & caches ────────────────────────────────────────────────────────────
+runs/
+yolov8n.pt
 *.log
 wandb/
 mlruns/

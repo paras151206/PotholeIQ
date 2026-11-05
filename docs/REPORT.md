@@ -1,4 +1,4 @@
-# PotholeIQ: Multi-Stage Deep Learning Pipeline for Pothole Detection, Damage Segmentation, and Repair Prioritization
+# PotholeIQ: Deep Learning Systems for Autonomous Pothole Detection, Localization, and Road Infrastructure Assessment
 
 **Student:** Paras Panchal  
 **Degree:** B.Tech Computer Science and Engineering (Artificial Intelligence and Machine Learning)  
@@ -10,205 +10,170 @@
 
 ## Abstract
 
-Automating the visual inspection and triage of municipal road damage requires systems that do not merely detect distress in isolation, but provide actionable engineering signals: localization, repair urgency, visual interpretability, duplicate submission resolution, and out-of-distribution anomaly flagging. In this study, we develop **PotholeIQ**, an integrated deep learning framework for end-to-end road condition assessment. Evaluated on a verified dataset of 681 real-world road images across a leak-free 70/15/15 stratified partition, our findings illustrate the progressive impact of deep learning paradigms:
-1. A flattened Multi-Layer Perceptron (TinyMLP) establishes an empirical baseline of 72.82% test accuracy ($F_1 = 0.7250$).
-2. A 4-block Custom Convolutional Neural Network (CustomCNN) eliminates 98.3% of parameters ($25.2\text{M} \to 425\text{K}$) while boosting test accuracy to 92.23% ($F_1 = 0.9223$, $\text{ROC-AUC} = 0.9868$).
-3. A two-phase fine-tuned MobileNetV2 architecture achieves 98.06% accuracy ($F_1 = 0.9806$, $\text{ROC-AUC} = 0.9985$).
-4. A Small U-Net architecture localizes damage patches with a test Dice coefficient of 0.9051 ($\text{IoU} = 0.8276$), feeding a geometric surface-area severity categorization.
-5. In-house Grad-CAM saliency mapping exposes exact textural failure modes across 8 test misclassifications (false positives caused by tree shadows and asphalt seams; false negatives caused by low-contrast edge erosion).
-6. A metric-learning Siamese network trained via contrastive loss reliably differentiates duplicate pothole submissions with 96.12% pair accuracy (intra-class distance 0.2210 vs inter-class distance 1.1988).
-7. An unsupervised Convolutional Autoencoder demonstrates the inherent real-world challenge of reconstruction-based anomaly detection on unconstrained asphalt textures ($\text{AUC} = 0.3008$, $F_1 = 0.6536$).
-Non-parametric 95% bootstrap confidence intervals confirm non-overlapping performance bounds between MLPs and CNNs, establishing a rigorous basis for university viva defense.
+Automating the visual inspection and triage of municipal road damage requires systems that provide actionable engineering signals: multi-instance localization, repair urgency heuristics, visual interpretability, duplicate submission resolution, and video processing. In this capstone project, we develop **PotholeIQ**, an integrated deep learning framework for road hazard assessment. Moving from image-level classification to spatial bounding-box object detection, our findings illustrate:
+
+1. **Classifier Progression:** A flattened Multi-Layer Perceptron (TinyMLP) establishes an empirical baseline of 72.82% test accuracy ($F_1 = 0.7250$). A 4-stage Custom Convolutional Neural Network eliminates 98.3% of parameters ($25.2\text{M} \to 425\text{K}$) while boosting accuracy to 92.23% ($F_1 = 0.9223$, $\text{ROC-AUC} = 0.9868$). A two-phase fine-tuned MobileNetV2 architecture achieves 98.06% accuracy ($F_1 = 0.9806$, $\text{ROC-AUC} = 0.9985$).
+2. **Object Detection (YOLOv8n):** Fine-tuning YOLOv8n on 1,590 verified images (5,684 ground-truth bounding boxes, 387 duplicates removed) yields **61.49% mAP@0.50**, **36.18% mAP@0.50:0.95**, **71.46% Precision**, and **55.34% Recall** on 239 held-out test images at 18 ms/frame inference speed, enabling both static image and driving video detection.
+3. **Scientific Integrity & Discarded Models:** We document two key negative results:
+   - *Discarded U-Net:* Training on rasterized rectangular bounding boxes caused U-Net to learn the box prior rather than true damage morphology; the high Dice (0.9051) was an artifact of box overlap, justifying its replacement by YOLOv8n.
+   - *Failed Autoencoder:* An unsupervised ConvAutoencoder trained on clean road images produced a test ROC-AUC of **0.3008** (worse than random guessing) because asphalt textures and shadows exhibit higher reconstruction variance than pothole cavities.
+4. **Explainability & Metric Learning:** In-house Grad-CAM saliency mapping exposes coarse activation areas ($4 \times 4$ feature resolution), while a Siamese network achieves 96.12% accuracy on paired synthetic augmentations.
+
+Non-parametric 95% bootstrap confidence intervals confirm non-overlapping bounds between MLPs and CNNs, establishing a rigorous foundation for university viva defense.
 
 ---
 
-## 1. Introduction
+## 1. Problem Statement & Engineering Requirements
 
-Potholes represent one of the most pervasive civil infrastructure hazards worldwide. According to transport safety boards, unaddressed road surface distress causes billions in vehicle repair costs and constitutes a leading cause of non-fatal and fatal traffic incidents. Traditional municipal assessment protocols depend primarily on periodic manual road audits or expensive laser-profilometer sensor vehicles that municipal budgets cannot deploy continuously.
+Road potholes cause catastrophic vehicle suspension failures, traffic congestion, and severe road accidents. Traditional municipal road inspections rely on manual visual patrols or specialized LiDAR survey vans that municipal budgets cannot sustain continuously.
 
-The objective of **PotholeIQ** is to demonstrate how modern deep learning methodologies can be composed into a coherent pipeline suitable for automated citizen grievance platforms and public works departments. Rather than treating road inspection as a narrow binary image classification task, the pipeline addresses the complete lifecycle from detection to repair decision:
-- **Detection:** Is there a structural defect in the road surface?
-- **Severity Quantification:** What proportion of the visible road plane is compromised, and does it demand Low, Medium, or High emergency response?
-- **Interpretability:** Can municipal engineers verify which visual patterns drove the automated verdict?
-- **Data Deduplication:** Can multiple citizen submissions documenting the same pothole under different lighting and camera angles be merged automatically?
-- **Unsupervised Anomaly Auditing:** Can anomalous road features be detected without relying exclusively on labeled training datasets?
-
----
-
-## 2. Methodology & Architecture
-
-### 2.1 Dataset Curation & Partitioning Protocol (M1)
-The primary data substrate comprises the Kaggle Pothole Detection dataset (`atulyakumar98/pothole-detection-dataset`). The raw repository was systematically audited, yielding exactly **681 unique photographic images**:
-- **Pothole Class ($y = 1$):** 329 images (48.31%)
-- **Normal Road Class ($y = 0$):** 352 images (51.69%)
-
-To prevent data leakage—a pervasive defect in undergraduate machine learning submissions—images were partitioned into fixed train, validation, and test sets using a **stratified split** with random seed $42$:
-- **Train Split (70%):** 476 images (230 pothole, 246 normal)
-- **Validation Split (15%):** 102 images (49 pothole, 53 normal)
-- **Test Split (15%):** 103 images (50 pothole, 53 normal)
-
-A formal leakage verification script was implemented in `src/data/split.py` to confirm that the intersection of absolute file paths between train, validation, and test partitions was strictly empty ($\mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{val}} \cap \mathcal{D}_{\text{test}} = \emptyset$). Split tables were serialized to CSV files (`data/splits/`) ensuring exact bit-level reproducibility across subsequent experiments.
-
-### 2.2 Baseline Multi-Layer Perceptron (M2)
-To quantify the inductive benefit of spatial convolutions, we formulated a naive fully connected baseline (`TinyMLP`). The input image ($128 \times 128 \times 3$) is completely flattened into a 1D vector of dimension $D = 49,152$. The architecture comprises:
-$$\mathbf{h}_1 = \text{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) \in \mathbb{R}^{512}, \quad \text{Dropout}(p=0.3)$$
-$$\mathbf{h}_2 = \text{ReLU}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2) \in \mathbb{R}^{128}, \quad \text{Dropout}(p=0.3)$$
-$$\hat{\mathbf{y}} = \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3 \in \mathbb{R}^{2}$$
-This parameterization introduces **25,232,258 parameters**, illustrating the extreme parameter inefficiency of dense connections on high-dimensional raw pixel inputs. Class weighting was applied to the cross-entropy objective:
-$$\mathcal{L}_{\text{CE}} = - \sum_{c=1}^C w_c y_c \log \hat{p}_c, \quad w_c = \frac{N}{C \cdot N_c}$$
-
-### 2.3 Custom Convolutional Neural Network (M3)
-The custom architecture (`CustomCNN`) was designed from first principles with four convolutional stages. Each stage consists of:
-$$\text{Conv2d}(k=3, s=1, p=1) \to \text{BatchNorm2d} \to \text{ReLU} \to \text{MaxPool2d}(k=2, s=2)$$
-The channel progression expands through $[32, 64, 128, 256]$. Spatial dimensions evolve as follows:
-$$128\times 128 \xrightarrow{\text{Block 1}} 64\times 64 \xrightarrow{\text{Block 2}} 32\times 32 \xrightarrow{\text{Block 3}} 16\times 16 \xrightarrow{\text{Block 4}} 8\times 8$$
-Crucially, rather than flattening the resulting $256 \times 8 \times 8$ tensor into 16,384 features, we incorporate **Global Average Pooling (GAP)**:
-$$\mathbf{z}_c = \frac{1}{H \times W} \sum_{i=1}^H \sum_{j=1}^W A_{c, i, j}$$
-Collapsing the spatial dimensions to $\mathbb{R}^{256}$ before a compact linear classification head ($256 \to 128 \to 2$). This architectural choice drops the total model parameter count to only **425,026** (a 98.3% parameter reduction vs TinyMLP) while eliminating spatial vulnerability to overfitting.
-
-To evaluate individual regularizers, three ablation variants were trained under identical seeds:
-- `cnn_no_aug`: Evaluates baseline sensitivity in the absence of spatial/photometric transformations.
-- `cnn_no_bn`: Evaluates training stability and internal covariate shift without batch normalization.
-- `cnn_no_dropout`: Evaluates stochastic feature co-adaptation suppression.
-
-### 2.4 Transfer Learning & Two-Phase Fine-Tuning (M4)
-To benchmark against state-of-the-art representations, we integrated **MobileNetV2** pre-trained on ImageNet-1K. Training was structured in two distinct phases:
-- **Phase 1 (Backbone Frozen):** All 19 inverted residual blocks of MobileNetV2 were held fixed ($\nabla_{\mathbf{\theta}_{\text{backbone}}} = \mathbf{0}$). Only a custom classification head ($\text{Dropout}(0.3) \to \text{Linear}(1280, 256) \to \text{ReLU} \to \text{Dropout}(0.15) \to \text{Linear}(256, 2)$) was optimized using Adam with a high learning rate ($\text{lr} = 10^{-3}$) and cosine annealing schedule for 5 epochs.
-- **Phase 2 (Partial Fine-Tuning):** The final three InvertedResidual blocks (blocks 16, 17, and 18, encompassing 1,534,530 trainable parameters) were unfrozen. Training proceeded for 6 epochs with a reduced learning rate ($\text{lr} = 5 \times 10^{-5}$) to prevent catastrophic forgetting of general visual primitives.
-
-### 2.5 Semantic Segmentation & Severity Quantification (M5)
-To delineate spatial boundaries and estimate damage severity, we constructed a symmetrical encoder-decoder network (`SmallUNet`):
-- **Encoder:** Channels expand $[3 \to 32 \to 64 \to 128]$ with max-pooling downsampling.
-- **Bottleneck:** Convolutional representation at depth 256 ($8 \times 8$ spatial resolution).
-- **Decoder:** Bilinear upsampling followed by concatenation with corresponding encoder skip connections and $3\times 3$ convolutions with channel progression $[128 \to 64 \to 32 \to 1]$.
-- **Compound Objective:** Because road potholes represent localized pixel anomalies, standard Cross-Entropy suffers from extreme class imbalance (background roads dominate surface pixels). We employ a composite loss:
-$$\mathcal{L}_{\text{Compound}} = 0.5 \mathcal{L}_{\text{BCE}} + 0.5 \left(1 - \frac{2 |\mathbf{P} \cap \mathbf{Y}| + \epsilon}{|\mathbf{P}| + |\mathbf{Y}| + \epsilon}\right)$$
-Severity is derived from the predicted binary mask area ratio $R = \frac{\sum P_{i,j}}{H \cdot W}$:
-$$\text{Severity} = \begin{cases} \text{Low}, & R < 0.05 \\ \text{Medium}, & 0.05 \le R \le 0.20 \\ \text{High}, & R > 0.20 \end{cases}$$
-
-### 2.6 Saliency Explainability via Grad-CAM (M6)
-To audit the decision boundary without external dependencies, we implemented Gradient-weighted Class Activation Mapping (Grad-CAM) directly from mathematical principles. Capturing gradients from the final convolutional block of `CustomCNN`:
-$$\alpha_k^c = \frac{1}{Z} \sum_{i=1}^H \sum_{j=1}^W \frac{\partial y^c}{\partial A_{k, i, j}}$$
-$$L_{\text{Grad-CAM}}^c = \text{ReLU}\left( \sum_k \alpha_k^c A^k \right)$$
-The positive linear combination ensures that features that decrease the target class score are suppressed, isolating regions that directly corroborate the presence of road distress.
-
-### 2.7 Metric Learning for Report Deduplication (M7)
-In practical municipal platforms, multiple citizens photograph the same pothole from varying distances and smartphone perspectives. To merge duplicate reports without requiring identical images, we constructed a Siamese feature extractor sharing weights with the convolutional backbone of `CustomCNN`. 
-The network maps inputs into a 128-dimensional hyperspherical metric space:
-$$d(\mathbf{x}_1, \mathbf{x}_2) = \|\mathbf{f}(\mathbf{x}_1) - \mathbf{f}(\mathbf{x}_2)\|_2$$
-Optimization was driven by Contrastive Loss with margin $m = 1.0$:
-$$\mathcal{L}_{\text{Contrastive}} = (1 - y) \frac{1}{2} d^2 + y \frac{1}{2} \max(0, m - d)^2$$
-where $y = 0$ denotes identical pothole instances (subject to heavy geometric, spatial, and color jitter) and $y = 1$ denotes distinct scenes.
-
-### 2.8 Unsupervised Anomaly Detection (M8)
-To address road defects that do not match supervised training templates, we designed a Convolutional Autoencoder (`ConvAutoencoder`, latent dimension 64) trained strictly on clean, damage-free road surfaces ($N_{\text{train}} = 246$). The reconstruction error serves as an anomaly detector:
-$$\text{Score}(\mathbf{x}) = \text{MSE}(\mathbf{x}, \hat{\mathbf{x}}) = \frac{1}{C H W} \sum_{c, i, j} (x_{c,i,j} - \hat{x}_{c,i,j})^2$$
-The anomaly decision threshold $\tau$ was tuned empirically on the validation split to maximize the validation $F_1$ score.
+**PotholeIQ** addresses this with an end-to-end computer vision pipeline tailored for public works departments:
+- **Detection & Localization:** Predict 2D bounding boxes and confidence scores around every distinct pothole in an image or driving video frame.
+- **Severity Triage Heuristic:** Compute the 2D surface area ratio occupied by damage ($A_{\text{box}} / A_{\text{img}}$: Low $<2\%$, Medium $2\%-8\%$, High $>8\%$) as an operational heuristic.
+- **Video Stream Inference:** Process driving camera footage frame-by-frame with real-time FPS reporting.
+- **Explainability:** Audit model decision boundaries using Grad-CAM saliency maps.
+- **Scientific Humility:** Transparently report failures and identify the operational boundaries of deep vision models on outdoor asphalt.
 
 ---
 
-## 3. Experimental Evaluation & Results
+## 2. Datasets & Rigorous Partitioning Protocols
 
-All models were evaluated on the held-out 103-image test partition. No model checkpoint was selected based on test performance; all weights reflect the minimum validation loss checkpoint.
+### 2.1 YOLO Object Detection Dataset (Bounding Boxes)
+- **Source:** Kaggle Potholes Detection YOLOv8 (`anggadwisunarto/potholes-detection-yolov8`)
+- **Format:** High-resolution road photography with standard YOLO `.txt` labels (`class x_center y_center width height` normalized to $[0, 1]$).
+- **De-duplication:** Full MD5 cryptographic hashing identified and removed **387 duplicate images** to prevent train-test data leakage.
+- **Stratified Partition (70% Train / 15% Val / 15% Test):**
+  - **Train Split:** 1,113 images (3,972 ground-truth boxes, avg 3.57/image)
+  - **Validation Split:** 238 images (825 ground-truth boxes, avg 3.47/image)
+  - **Test Split (Held-Out):** 239 images (887 ground-truth boxes, avg 3.71/image)
+  - **Leakage Verification:** Disjointness test confirmed zero image hash overlap across all three splits ($\mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{val}} \cap \mathcal{D}_{\text{test}} = \emptyset$).
 
-### 3.1 Primary Classifier Benchmark
+### 2.2 Binary Classification Dataset
+- **Source:** Kaggle Pothole Detection Dataset (`atulyakumar98/pothole-detection-dataset`)
+- **Total Images:** 681 real road images (329 Pothole / 352 Normal Road).
+- **Partition:** Stratified 70/15/15 split (476 train / 102 val / 103 test) with fixed seed `42`.
 
-| Model | Parameters | Test Accuracy | Macro Precision | Macro Recall | Macro $F_1$ | Test ROC-AUC |
+---
+
+## 3. Architecture Design & Methodologies
+
+### 3.1 Object Detection via YOLOv8n
+YOLOv8n employs a modified CSPDarknet53 backbone with C2f (Cross-Stage Partial with two convolutions) feature extraction modules, a Path Aggregation Network (PANet) feature pyramid, and an anchor-free decoupled detection head.
+- **Loss Function:**
+  $$\mathcal{L}_{\text{YOLO}} = \lambda_{\text{box}} \mathcal{L}_{\text{CIoU}} + \lambda_{\text{cls}} \mathcal{L}_{\text{BCE}} + \lambda_{\text{dfl}} \mathcal{L}_{\text{DFL}}$$
+  where CIoU aligns bounding box center, aspect ratio, and intersection-over-union, and Distribution Focal Loss (DFL) models coordinate regression uncertainty.
+- **Training Protocol:** Fine-tuned from COCO-pretrained weights for 8 epochs on an AMD Ryzen 7 7840HS CPU at image resolution $416 \times 416$ with batch size 16 and AdamW optimizer.
+
+### 3.2 Classifier Progression
+1. **TinyMLP Baseline:** Flattened input ($3 \times 128 \times 128 = 49,152$ inputs) through dense layers ($49152 \to 512 \to 128 \to 2$) with Dropout ($p=0.3$), totaling 25.2 million parameters.
+2. **CustomCNN (4-Stage):** Convolutions with channel progression $[32, 64, 128, 256]$, Batch Normalization, ReLU, MaxPool, and Global Average Pooling (GAP), reducing parameters to 425,026.
+3. **MobileNetV2 Transfer:** Pretrained ImageNet backbone fine-tuned in two phases:
+   - Phase 1: Backbone frozen, custom head ($1280 \to 256 \to 2$) trained with Adam ($\text{lr} = 10^{-3}$) for 5 epochs.
+   - Phase 2: Top 3 InvertedResidual blocks unfrozen, trained with reduced learning rate ($\text{lr} = 5 \times 10^{-5}$) for 6 epochs.
+
+### 3.3 Explainability via Grad-CAM
+Manual implementation of Gradient-weighted Class Activation Mapping:
+$$\alpha_k^c = \frac{1}{Z} \sum_{i=1}^H \sum_{j=1}^W \frac{\partial y^c}{\partial A_{k, i, j}}, \quad L_{\text{Grad-CAM}}^c = \text{ReLU}\left(\sum_k \alpha_k^c A^k\right)$$
+Targeting the final convolutional layer of MobileNetV2 ($4 \times 4$ spatial feature maps).
+
+---
+
+## 4. Comprehensive Experimental Results
+
+### 4.1 YOLOv8n Object Detection Performance (Held-Out Test Set)
+
+Evaluated on the **239 held-out test images** (887 ground-truth instances):
+
+| Metric | Score | Practical Significance |
+|---|:---:|---|
+| **Precision** | **71.46%** | Low false alarm rate; high reliability when flagging road damage |
+| **Recall** | **55.34%** | Detects over half of all pothole instances; misses minor/shallow edge cracks |
+| **mAP @ 0.50** | **61.49%** | Robust detection accuracy under standard PASCAL VOC IoU criteria |
+| **mAP @ 0.50:0.95** | **36.18%** | Rigorous COCO multi-threshold overlap evaluation |
+| **Inference Latency** | **18.0 ms / frame** | Real-time throughput (~55 FPS) on CPU |
+| **Model Size** | **6.47 MB** | Suitable for low-power edge compute and dashcam deployment |
+
+### 4.2 Primary Classifier Benchmark (103 Test Images)
+
+| Architecture | Parameters | Test Accuracy | Macro Precision | Macro Recall | Macro $F_1$ | ROC-AUC |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **TinyMLP (M2 Baseline)** | 25,232,258 | 72.82% | 0.7334 | 0.7257 | 0.7250 | 0.8502 |
-| **CustomCNN (M3 Proposed)** | **425,026** | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** |
-| **MobileNetV2 (M4 Transfer)** | 2,544,130 | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** |
+| **TinyMLP Baseline** | 25,232,258 | 72.82% | 0.7334 | 0.7257 | 0.7250 | 0.8502 |
+| **CustomCNN** | **425,026** | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** |
+| **MobileNetV2** | 2,544,130 | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** |
 
-### 3.2 Non-Parametric Bootstrap Confidence Intervals (95% CI)
-To account for test set variance ($N = 103$), 1,000 bootstrap resamplings with replacement were conducted (`results/metrics/bootstrap_ci_summary.json`):
+### 4.3 Statistical Analysis & Non-Parametric Bootstrap Confidence Intervals
 
-| Model Architecture | Mean Test Accuracy | 95% Accuracy CI | Mean Test $F_1$ | 95% $F_1$ CI |
+Evaluating small test splits ($N = 103$) with 1,000 bootstrap resamplings (`results/metrics/bootstrap_ci_summary.json`):
+
+| Model | Mean Test Accuracy | 95% Accuracy CI | Mean Test $F_1$ | 95% $F_1$ CI |
 |---|:---:|:---:|:---:|:---:|
 | **TinyMLP Baseline** | 72.71% | [64.08%, 81.55%] | 72.19% | [63.58%, 80.68%] |
 | **CustomCNN** | 92.29% | [87.38%, 97.09%] | 92.22% | [86.77%, 97.08%] |
 | **MobileNetV2** | 98.08% | [95.15%, 100.0%] | 98.06% | [95.02%, 100.0%] |
 
-**Statistical Deduction:** Because the 95% $F_1$ confidence interval for `CustomCNN` ($[0.8677, 0.9708]$) exhibits zero intersection with the interval for `TinyMLP` ($[0.6358, 0.8068]$), we reject the null hypothesis of equivalent performance at $p < 0.05$. The translation equivariance and hierarchical receptive fields of CNNs provide a provably significant improvement over dense layers on asphalt imagery.
+**Statistical Insight:** The 95% $F_1$ confidence intervals for `CustomCNN` ($[0.8677, 0.9708]$) and `TinyMLP` ($[0.6358, 0.8068]$) are completely non-overlapping. This provides **strong empirical evidence** that convolutional feature hierarchies outperform flattened dense projections. However, because the test partition contains 103 images, fine-grained differences between MobileNetV2 and CustomCNN should be stated with appropriate statistical caution.
 
-### 3.3 CustomCNN Ablation Analysis
+### 4.4 CustomCNN Ablation Study
 
-| Configuration | Test Accuracy | Macro Precision | Macro Recall | Macro $F_1$ | Test ROC-AUC | Performance Delta |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Full CustomCNN** | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** | **Reference** |
-| Without Augmentation | 86.41% | 0.8641 | 0.8645 | 0.8637 | 0.9438 | **-5.86% $F_1$** |
-| Without BatchNorm | 88.35% | 0.8845 | 0.8828 | 0.8833 | 0.9453 | **-3.90% $F_1$** |
-| Without Dropout | 92.23% | 0.9240 | 0.9234 | 0.9223 | 0.9872 | $\pm 0.00\%$ |
+| Ablation Variant | Test Accuracy | Macro $F_1$ | ROC-AUC | Observation |
+|---|:---:|:---:|:---:|---|
+| **Full CustomCNN** | **92.23%** | **0.9223** | **0.9868** | Reference baseline |
+| Without Augmentation | 86.41% | 0.8637 | 0.9438 | **-5.86% $F_1$** drop; overfits training road surfaces |
+| Without BatchNorm | 88.35% | 0.8833 | 0.9453 | **-3.90% $F_1$** drop; slower optimization convergence |
+| Without Dropout | 92.23% | 0.9223 | 0.9872 | Identical test accuracy, but wider train-val loss gap |
 
-**Ablation Insights:**
-- *Data Augmentation* produced the largest single generalization gain (+5.86% $F_1$). Because road photographs suffer from extreme orientation and lighting variability, photometric jitter and spatial flips are essential regularizers.
-- *Batch Normalization* accelerated convergence and smoothed optimization, providing a +3.90% boost in $F_1$.
-
-### 3.4 Segmentation Performance & Damage Triage (M5)
-The U-Net model achieved a test Dice coefficient of **0.9051** and an Intersection over Union (IoU) of **0.8276**. Categorizing the 103 test scenes into repair tiers yielded:
-- **Low Severity ($< 5\%$ road surface damaged):** 42 scenes (40.8%)
-- **Medium Severity ($5\% - 20\%$ road surface damaged):** 15 scenes (14.6%)
-- **High Severity ($> 20\%$ road surface damaged):** 46 scenes (44.7%)
-
-### 3.5 Duplicate Report Deduplication (M7)
-The Siamese network converged to an average Euclidean distance of **0.2210** for positive image pairs (simulated same-pothole re-observations) and **1.1988** for negative pairs (different scenes), yielding a pair classification accuracy of **96.12%** under the optimal threshold of $d < 0.50$.
-
-### 3.6 Supervised vs Unsupervised Anomaly Detection (M8)
-The convolutional autoencoder selected an optimal anomaly reconstruction threshold of $\tau = 0.179765$ on the validation set ($F_{1, \text{val}} = 0.6400$). Evaluated on the test split:
-- Test Accuracy: 48.54%
-- Test Recall: 100.0% (all 50 potholes successfully triggered $\text{MSE} \ge \tau$)
-- Test Precision: 48.54%
-- Test $F_1$: 0.6536
-- Test ROC-AUC: 0.3008
-
-**Critical Comparative Analysis:** While the supervised classifier (MobileNetV2) attained a stellar $F_1$ of 0.9806, the unsupervised autoencoder suffered from substantial false alarm rates on unconstrained road surfaces. Normal road images frequently exhibited tree shadows, lane markings, and gravel textures that the autoencoder failed to reconstruct cleanly, thereby elevating normal road MSE scores above $\tau$. This demonstrates why supervised discriminative models remain mandatory when labelled defect data is accessible.
+*Limitation:* With 103 test samples, subtle regularizers like Dropout fall within the bootstrap margin of error.
 
 ---
 
-## 4. Explainability & Failure Analysis
+## 5. Negative Results & Scientific Integrity
 
-Inspection of Grad-CAM heatmaps across all 8 test set misclassifications (`results/metrics/gradcam_failure_analysis.txt`) revealed two primary failure typologies:
+A core contribution of this capstone is candidly documenting where theoretical methods broke down in practice:
 
-```
-False Positives (Normal Road misclassified as Pothole, n=5, Mean Confidence = 75.19%)
-├── Cause A: Tree canopy shadows projecting high-contrast irregular dark boundaries onto asphalt.
-└── Cause B: Bitumen over-banding and asphalt repair seams exhibiting low-reflectance contours.
+### 5.1 Discarded U-Net Pseudo-Mask Segmentation
+- **Initial Hypothesis:** A Small U-Net trained on rasterized bounding boxes could predict continuous damage masks and inform repair urgency.
+- **Empirical Reality:** Because ground truth was constructed by rasterizing rectangular boxes, the U-Net learned the geometric rectangular box prior rather than true ragged pothole contours.
+- **Artificial Metrics:** The high reported Dice coefficient ($0.9051$) and IoU ($0.8276$) were mathematically inflated artifacts of predicting rectangles to match rectangles.
+- **Engineering Decision:** Discarded U-Net from the main inference pipeline. Object detection (YOLOv8n) is the mathematically correct paradigm for bounding box supervision.
 
-False Negatives (Pothole misclassified as Normal Road, n=3, Mean Confidence = 57.28%)
-├── Cause A: Shallow edge erosion lacking distinct shadow depth contours.
-└── Cause B: High-noon sun glare over exposed aggregate washing out local high-frequency gradients.
-```
+### 5.2 Failed Autoencoder Anomaly Detection
+- **Initial Hypothesis:** Training an unsupervised Convolutional Autoencoder on normal road images would detect potholes via elevated reconstruction MSE.
+- **Empirical Reality:** Evaluated on the test split, the autoencoder achieved an ROC-AUC of **0.3008** (substantially worse than random chance).
+- **Failure Cause:** Natural road surfaces exhibit high-frequency aggregate textures, shadows, tar lines, and white lane paint that produce higher reconstruction errors than smooth dark pothole basins. Unsupervised generative reconstruction failed on unconstrained outdoor asphalt.
 
-Grad-CAM successfully exposed that the network occasionally relies on dark contrast shortcuts rather than volumetric depression depth, providing actionable guidance for subsequent dataset augmentation.
-
----
-
-## 5. Software Architecture & Deployment
-
-The complete pipeline is packaged as a lightweight, reproducible application:
-- **`smoke_test.py`:** An automated 11-point unit and integration test suite executing synthetic forward passes across all architectures in under 20 seconds.
-- **`app/app.py`:** An interactive Streamlit dashboard featuring:
-  - **Tab 1 (Classifier):** Displays confidence metrics, predicted probability bars, and model provenance.
-  - **Tab 2 (Segmentation):** Overlays predicted damaged boundaries with live urgency triage.
-  - **Tab 3 (Grad-CAM):** Visualizes convolutional saliency maps.
-  - **Tab 4 (Anomaly Detection):** Visualizes autoencoder input-reconstruction pairs and reports MSE error relative to $\tau$.
+### 5.3 Synthetic Siamese Pairs
+- **The Caveat:** Metric learning with Contrastive Loss achieved 96.12% pair accuracy, but positive pairs were synthesized via heavy spatial and photometric augmentations due to the absence of multi-temporal road surveys in public datasets.
 
 ---
 
-## 6. Conclusion & Future Work
+## 6. Software Architecture & Deployment
 
-In this project, we conceptualized, implemented, trained, and defended **PotholeIQ**, an end-to-end deep learning system for road damage detection and prioritization. By progressing methodically through the universal machine learning workflow—from a 25.2M-parameter baseline MLP to an efficient 425K-parameter CustomCNN and an ImageNet fine-tuned MobileNetV2—we demonstrated clear empirical mastery of deep learning principles. 
+The system is packaged as an interactive Streamlit application (`app/app.py`):
+- **Tab 1 (Detect Image):** Real-time YOLOv8n object detection with confidence slider, severity heuristic, side-by-side view, and structured bounding-box coordinates table.
+- **Tab 2 (Detect Video):** Video processing pipeline capping clips to 15 seconds, rendering live detection counts, FPS throughput, and H.264 browser-compatible video playback via `imageio`.
+- **Tab 3 (Classifier & Grad-CAM):** Binary classification with coarse activation heatmaps and explicit explainability notices.
+- **Tab 4 (Experiments):** Full model comparison tables, ablation metrics, PR curves, and prediction galleries.
+- **Tab 5 (Negative Results & Viva):** Transparent post-mortem of U-Net and Autoencoder failures with 3 essential viva defense Q&As.
+- **Tab 6 (Road Hazard Map):** Interactive demo map with simulated GPS damage points.
 
-Key future directions include:
-1. Integrating temporal recurrent networks (LSTMs or Transformers) on longitudinal road survey video streams to monitor pothole deterioration over seasonal freeze-thaw cycles.
-2. Deploying Foundation Segmentation Models (such as SAM) to upgrade weak bounding-box priors to high-fidelity polygonal ground truth.
-3. Quantizing MobileNetV2 via INT8 Post-Training Quantization (PTQ) for edge deployment on low-power municipal dashcams.
+---
+
+## 7. Viva Defense Q&A Guide
+
+**Q1: Why did you transition from U-Net segmentation to YOLOv8n object detection?**  
+*Answer:* The dataset annotations were bounding boxes. Rasterizing them into rectangular masks causes a segmentation network to memorize rectangular bounding priors rather than irregular pothole contours. Object detection is the mathematically proper formulation for bounding-box supervision.
+
+**Q2: What is the significance of your 95% bootstrap confidence intervals?**  
+*Answer:* With a 103-image test split, single point metrics carry sampling variance. 1,000 bootstrap resamplings showed zero overlap between CNN ($[86.77\%, 97.08\%]$) and MLP ($[63.58\%, 80.68\%]$), establishing strong empirical evidence of superior convolutional inductive bias.
+
+**Q3: Can your system measure pothole depth or volume?**  
+*Answer:* No. A monocular RGB camera cannot recover metric depth without stereo calibration or LiDAR. Our severity index is an explicit 2D surface area heuristic.
 
 ---
 
 ## References
 
-1. He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep residual learning for image recognition. *CVPR*, 770–778.
+1. Jocher, G., Chaurasia, A., & Qiu, J. (2023). Ultralytics YOLOv8 (Version 8.0.0). *GitHub*.
 2. Sandler, M., Howard, A., Zhu, M., Zhmoginov, A., & Chen, L. C. (2018). MobileNetV2: Inverted residuals and linear bottlenecks. *CVPR*, 4510–4520.
-3. Ronneberger, O., Fischer, P., & Brox, T. (2015). U-Net: Convolutional networks for biomedical image segmentation. *MICCAI*, 234–241.
-4. Selvaraju, R. R., Cogswell, M., Das, A., Vedaldi, A., Parikh, D., & Batra, D. (2017). Grad-CAM: Visual explanations from deep networks via gradient-based localization. *ICCV*, 618–626.
-5. Koch, G., Zemel, R., & Salakhutdinov, R. (2015). Siamese neural networks for one-shot image recognition. *ICML Deep Learning Workshop*.
+3. Selvaraju, R. R., et al. (2017). Grad-CAM: Visual explanations from deep networks via gradient-based localization. *ICCV*, 618–626.
+4. Ronneberger, O., Fischer, P., & Brox, T. (2015). U-Net: Convolutional networks for biomedical image segmentation. *MICCAI*, 234–241.

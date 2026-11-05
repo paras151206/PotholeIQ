@@ -152,6 +152,15 @@ def test_gradcam_import():
     assert GradCAM is not None
 
 
+def test_yolo_detector():
+    from ultralytics import YOLO
+    model = YOLO("yolov8n.pt")
+    dummy = np.zeros((416, 416, 3), dtype=np.uint8)
+    res = model(dummy, verbose=False)
+    assert len(res) == 1
+    assert hasattr(res[0], "boxes")
+
+
 # ─────────────────────────── Runner ──────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -170,6 +179,7 @@ if __name__ == "__main__":
     run("Siamese + ContrastiveLoss", test_siamese)
     run("Convolutional Autoencoder", test_autoencoder)
     run("Grad-CAM import",           test_gradcam_import)
+    run("YOLOv8n Object Detector",   test_yolo_detector)
 
     print(f"\n{'=' * 55}")
     print(f"  Results: {len(PASSED)} passed, {len(FAILED)} failed")

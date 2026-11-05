@@ -1,452 +1,351 @@
+# PotholeIQ — Oral Viva Defense Guide
 
-# PotholeIQ — Viva Guide
-
-> Every module explained in plain language, key equations, design choices, and 5 viva Q&As.
-> Read this alongside the code, not instead of it.
+> Every module explained in plain language, key mathematical equations, design choices, negative results analysis, and 5 viva Q&As per module.
+> Authored by Paras Panchal for B.Tech CSE (AI/ML) Deep Learning course project defense.
 
 ---
 
-## M0 — Repo Setup
+## M0 — Repo Setup & Engineering Foundations
 
 ### What was built
-Config-driven skeleton: `config.yaml`, `requirements.txt`, seed utilities (`set_all_seeds`, `worker_init_fn`), metric helpers, plotting helpers, `smoke_test.py`.
+Config-driven skeleton: `config.yaml`, `requirements.txt`, seed utilities (`set_all_seeds`, `worker_init_fn`), metric helpers, plotting helpers, and `smoke_test.py`.
 
 ### Key design choices
 | Choice | Reason |
-|--------|--------|
+|---|---|
 | `config.yaml` for all hyperparams | Version-controlled experiments; no magic numbers in code |
-| `seed=42` everywhere | Reproducibility — same split, same init, same augmentation |
+| `seed=42` everywhere | Reproducibility — identical split, identical weight init, deterministic augmentations |
 | `worker_init_fn` in DataLoader | Forked workers share RNG state; without this, all workers produce identical augmentations |
-| `cuDNN deterministic=True` | Forces reproducible (not fastest) convolution algorithm |
+| `cuDNN deterministic=True` | Forces reproducible (not benchmarked) convolution algorithm |
 
 ### Viva Q&A
 
 **Q1: Why do you need `worker_init_fn` in a DataLoader?**
-> When PyTorch forks workers, all inherit the same NumPy/Python RNG state from the parent. Without `worker_init_fn`, every worker applies *identical* random augmentations each epoch, defeating the purpose. The fix derives a unique seed from each worker's ID.
+> When PyTorch forks workers, all inherit the same NumPy/Python RNG state from the parent process. Without `worker_init_fn`, every worker applies *identical* random augmentations each epoch, defeating the purpose of multi-worker augmentation. The fix derives a unique seed from each worker's ID (`base_seed + worker_id`).
 
 **Q2: What is the cost of `torch.backends.cudnn.deterministic=True`?**
-> cuDNN normally benchmarks several convolution algorithms at startup and picks the fastest. `deterministic=True` forces a fixed (reproducible) choice, typically 5–15% slower training. Worth it for reproducibility in a research project.
+> cuDNN normally benchmarks several convolution algorithms at startup and selects the fastest. `deterministic=True` forces a fixed, mathematically reproducible algorithm, typically running 5–15% slower. It is mandatory for scientific reproducibility.
 
 **Q3: Why keep hyperparameters in YAML vs argparse?**
-> YAML is version-controlled — every git commit records exact hyperparameters. With argparse you must remember to log every flag. With YAML you get a full experiment log for free.
+> YAML files are checked into git — every git commit permanently records the exact hyperparameters used. With argparse you must remember to log every flag manually. With YAML you get a full experiment audit trail for free.
 
-**Q4: What is a `.gitkeep` file?**
-> Git doesn't track empty directories. A zero-byte `.gitkeep` forces git to include the directory so collaborators get the right folder structure after cloning.
+**Q4: What is the purpose of `smoke_test.py`?**
+> It runs rapid synthetic forward passes through all 12 model architectures, loss functions, and detectors without requiring full datasets. If any layer shape, tensor dimension, or dependency is broken, it fails immediately in under 15 seconds.
 
 **Q5: Explain the difference between `torch.manual_seed` and `torch.cuda.manual_seed_all`.**
-> PyTorch maintains separate RNG states for CPU and each GPU. `manual_seed` seeds only the CPU RNG. `cuda.manual_seed_all` seeds the CUDA RNG on every GPU device. Both must be set for full reproducibility on GPU.
+> PyTorch maintains separate RNG states for CPU and each GPU device. `manual_seed` seeds only the CPU RNG. `cuda.manual_seed_all` seeds the CUDA RNG on every attached GPU device. Both must be set for full cross-device reproducibility.
 
 ---
 
-## M1 — Data Pipeline
+## M1 — Data Pipeline & Leakage Prevention
 
 ### What was built
-`dataset.py` (4 dataset classes), `download.py` (Kaggle API), `split.py` (stratified split + leakage check), `eda.py` (5 plots).
+`dataset.py`, `download.py` (Kaggle API), `split.py` (stratified split + leakage check), `prepare_yolo_dataset.py` (MD5 deduplication + YOLO format verification).
 
-### Dataset: Kaggle Pothole Detection (atulyakumar98)
-| Field | Value |
-|-------|-------|
-| Source | Kaggle — atulyakumar98/pothole-detection-dataset |
-| Licence | CC0 Public Domain |
-| Annotations | YOLO bounding boxes (class x_center y_center w h, normalised) |
-| Split | 70/15/15 stratified, seed=42, NO leakage verified |
-
-### Key design choices
-| Choice | Reason |
-|--------|--------|
-| Stratified split | Preserves class balance in each subset |
-| Leakage check by filename stem | Ensures the same image doesn't appear in train AND test |
-| Flexible dataset discovery | Handles YOLO split layout, class-folder layout, and flat layout |
-| `NormalRoadDataset` | Used for AE training — no labels, only normal images |
+### Datasets Summary
+| Dataset | Source | Total Images | Annotations | Partitioning |
+|---|---|:---:|---|---|
+| **YOLO Detection** | `anggadwisunarto/potholes-detection-yolov8` | 1,590 unique (387 duplicates removed) | 5,684 YOLO `.txt` bounding boxes | 70% Train (1113) / 15% Val (238) / 15% Test (239) |
+| **Classification** | `atulyakumar98/pothole-detection-dataset` | 681 | Binary labels (329 pothole / 352 normal) | 70% Train (476) / 15% Val (102) / 15% Test (103) |
 
 ### Key equations
+**Data split sizes** ($N$ = total images, $r_1=0.70, r_2=0.15, r_3=0.15$):
+$$N_{\text{train}} = \lfloor r_1 \cdot N \rfloor, \quad N_{\text{val}} = \lfloor r_2 \cdot N \rfloor, \quad N_{\text{test}} = N - N_{\text{train}} - N_{\text{val}}$$
 
-**Data split sizes** (N = total images, r₁=0.70, r₂=0.15, r₃=0.15):
-$$N_{train} = \lfloor r_1 \cdot N \rfloor, \quad N_{val} = \lfloor r_2 \cdot N \rfloor, \quad N_{test} = N - N_{train} - N_{val}$$
-
-**YOLO → pixel coordinate conversion** (for bbox mask generation):
-$$x_1 = (x_c - w/2) \cdot W_{img}, \quad y_1 = (y_c - h/2) \cdot H_{img}$$
+**Normalized YOLO to pixel coordinates:**
+$$x_1 = (x_c - w/2) \cdot W_{\text{img}}, \quad y_1 = (y_c - h/2) \cdot H_{\text{img}}$$
+$$x_2 = (x_c + w/2) \cdot W_{\text{img}}, \quad y_2 = (y_c + h/2) \cdot H_{\text{img}}$$
 
 ### Viva Q&A
 
-**Q1: Why use stratified splitting instead of random?**
-> Random splitting can produce splits with very different class ratios by chance (especially with small datasets). Stratified split guarantees that each subset reflects the overall class distribution (e.g., if 40% are potholes overall, each split is ~40% pothole).
+**Q1: Why use stratified splitting instead of random splitting?**
+> Random splitting can produce imbalanced subsets by chance. Stratified splitting guarantees that the positive/negative ratio in train, val, and test partitions exactly matches the overall population distribution (~48.3% potholes).
 
-**Q2: What is data leakage and how did you check for it?**
-> Data leakage = the same image (or a near-duplicate) appears in both train and test. We check by comparing filename stems (without extension) across all three splits. If any stem appears in more than one split, the script raises `AssertionError` and aborts.
+**Q2: How did you ensure zero data leakage?**
+> In both datasets, we computed cryptographic MD5 file hashes across all image files. In the YOLO dataset, 387 duplicate images were identified and removed. We then ran automated disjointness assertions ($\mathcal{D}_{\text{train}} \cap \mathcal{D}_{\text{val}} \cap \mathcal{D}_{\text{test}} = \emptyset$) to ensure zero overlap.
 
 **Q3: What transforms do you apply during training vs validation?**
-> Train: Resize→RandomHFlip→RandomRotation→ColorJitter→ToTensor→Normalize→RandomErasing. Validation/Test: Resize→ToTensor→Normalize only. Using augmentation at val/test would make evaluation non-deterministic and unfairly penalise the model.
+> Train: Resize $\to$ RandomHorizontalFlip $\to$ RandomRotation $\to$ ColorJitter $\to$ ToTensor $\to$ Normalize $\to$ RandomErasing. Validation/Test: Resize $\to$ ToTensor $\to$ Normalize only. Applying random augmentations at test time would introduce evaluation stochasticity.
 
-**Q4: Why do you use ImageNet mean/std for normalization?**
-> Pre-trained models (MobileNetV2) were trained with ImageNet normalisation, so we must use the same stats to match the input distribution the backbone expects. For the custom CNN, using the same stats simplifies comparison and doesn't significantly hurt (road images aren't too far from ImageNet statistics).
+**Q4: Why use ImageNet normalization statistics for road images?**
+> Pretrained models like MobileNetV2 and YOLO backbones were pretrained with ImageNet mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`. Matching these statistics ensures input pixel distributions align with the filters learned during pretraining.
 
-**Q5: What is the YOLO annotation format and how do you convert it to a mask?**
-> YOLO: `class_id x_center y_center width height` (all normalised 0–1 relative to image size). Conversion: multiply by image pixel dimensions to get the bounding box corners in pixels, then fill that rectangle with 1s in a zero-initialised binary mask. This is a rectangular approximation — a known limitation documented in the README.
+**Q5: Why did you remove 387 duplicate images from the YOLO dataset?**
+> Web-scraped and municipal datasets often contain duplicate or burst-shot identical frames. If an image appears in both train and test, the model memorizes it and inflates test evaluation metrics (data leakage). Deduplication ensures legitimate test generalization.
 
 ---
 
-## M2 — Baseline (TinyMLP)
+## M2 — Baseline Multi-Layer Perceptron (TinyMLP)
 
 ### What was built
-`baseline.py` — 2-layer MLP; `train_baseline.py` — training script.
+`baseline.py` — 2-hidden-layer MLP on flattened raw pixels ($3 \times 128 \times 128 = 49,152$ inputs); `train_baseline.py`.
 
-### Architecture
+### Architecture & Parameters
 ```
 Input: (B, 3, 128, 128) → Flatten → (B, 49152)
 Linear(49152, 512) → ReLU → Dropout(0.3) → (B, 512)
 Linear(512, 128)   → ReLU → Dropout(0.3) → (B, 128)
-Linear(128, 2)                             → (B, 2) [logits]
+Linear(128, 2)     → (B, 2) [logits]
+Total Parameters: 25,232,258 (100.9 MB)
 ```
 
-### Key design choices
-| Choice | Reason |
-|--------|--------|
-| MLP as baseline (not logistic regression) | PyTorch-native; easier to integrate in the same training pipeline |
-| Weighted cross-entropy | Handles class imbalance without discarding data |
-| No augmentation | Establishes the floor; augmentation is introduced in M3 |
-
-### Key equation
-**Weighted cross-entropy loss:**
-$$\mathcal{L}_{WCE} = -\sum_{c} w_c \cdot y_c \log(\hat{p}_c)$$
-where $w_c = \frac{N}{K \cdot N_c}$ (inverse frequency weight, $K$ = number of classes).
+### Performance on 103 Test Images
+- **Accuracy:** 72.82%
+- **Macro F1:** 0.7250
+- **ROC-AUC:** 0.8502
 
 ### Viva Q&A
 
-**Q1: Why do you use a baseline model at all?**
-> The baseline sets a performance floor. If your CNN can't beat the MLP, you have a training bug — not a model problem. Any improvement on the baseline is evidence the CNN is extracting useful features, not just memorising class priors.
+**Q1: Why build an MLP baseline if you know CNNs are better?**
+> In the universal machine learning workflow, you must establish an empirical lower bound. The MLP baseline tests whether road images are linearly or non-spatially separable and quantifies the exact gain provided by convolutional inductive biases.
 
-**Q2: What is label smoothing and did you use it in the baseline?**
-> Label smoothing replaces hard target 1 with $1 - \varepsilon$ and 0 with $\varepsilon/K$, preventing the model from becoming overconfident. We did NOT use it for the baseline (we want it to be simple). We use it in the custom CNN (ε=0.1) to show its effect.
+**Q2: Why is flattening an image parameter-inefficient?**
+> A single dense connection from $49,152$ inputs to $512$ neurons requires $49,152 \times 512 + 512 = 25,166,336$ weights in the first layer alone. It treats adjacent pixels as completely independent, discarding 2D spatial locality.
 
-**Q3: How does class-weight computation work?**
-> `sklearn.utils.class_weight.compute_class_weight('balanced', ...)` returns $w_c = N / (K \cdot N_c)$. The minority class gets a higher weight, so its misclassification is penalised more in the loss. This is equivalent to oversampling the minority class.
+**Q3: What inductive bias does an MLP lack compared to a CNN?**
+> MLPs lack **translation equivariance** (if a pothole shifts 5 pixels, an MLP sees entirely new input features) and **spatial locality** (pixels close together are correlated; distant pixels are not).
 
-**Q4: What accuracy would a random classifier achieve on this dataset?**
-> A random classifier achieves accuracy equal to the majority class fraction. E.g., if 60% of images are normal, random guessing normal always gives 60% accuracy. The baseline must beat this to be useful.
+**Q4: How does weighted cross-entropy address class imbalance?**
+> By weighting loss inversely proportional to class frequency: $w_c = N / (C \cdot N_c)$. Errors on the minority class produce proportionally larger gradients, preventing the network from defaulting to majority-class predictions.
 
-**Q5: Why flatten the image for the MLP instead of using 2D input?**
-> An MLP treats each pixel as an independent feature — it has no concept of spatial locality. By flattening, we lose all spatial structure. This is precisely why CNNs outperform MLPs on images: convolutions share weights across space and exploit local correlations.
+**Q5: Why did the MLP achieve 72.82% accuracy despite having 25 million parameters?**
+> Massive overparameterization without spatial inductive bias caused the MLP to memorize background road color and brightness rather than structural cavity contours.
 
 ---
 
-## M3 — Custom CNN
+## M3 — Custom 4-Stage CNN & Ablation Studies
 
 ### What was built
-`cnn.py` — Custom CNN with 4 ConvBlocks; `train_cnn.py` — training + ablation studies.
+`cnn.py` — 4-stage convolutional network with BatchNorm, Dropout, and Global Average Pooling; `train_cnn.py`.
 
-### Architecture
+### Architecture Progression
 ```
-Input: (B, 3, 128, 128)
-ConvBlock-1: Conv(3→32)  → BN → ReLU → MaxPool → (B, 32,  64, 64)
-ConvBlock-2: Conv(32→64) → BN → ReLU → MaxPool → (B, 64,  32, 32)
-ConvBlock-3: Conv(64→128)→ BN → ReLU → MaxPool → (B, 128, 16, 16)
-ConvBlock-4: Conv(128→256)→BN → ReLU → MaxPool → (B, 256,  8,  8)
-GlobalAvgPool(1)                                 → (B, 256,  1,  1)
-Flatten                                          → (B, 256)
-Linear(256, 128) → ReLU → Dropout(0.4) → Linear(128, 2) → (B, 2)
+Stage 1: Conv2d(3→32, k=3, p=1)   → BN → ReLU → MaxPool(2) → (B, 32, 64, 64)
+Stage 2: Conv2d(32→64, k=3, p=1)  → BN → ReLU → MaxPool(2) → (B, 64, 32, 32)
+Stage 3: Conv2d(64→128, k=3, p=1) → BN → ReLU → MaxPool(2) → (B, 128, 16, 16)
+Stage 4: Conv2d(128→256, k=3, p=1)→ BN → ReLU → MaxPool(2) → (B, 256, 8, 8)
+Head:    GlobalAvgPool2d → Linear(256→128) → ReLU → Dropout(0.4) → Linear(128→2)
+Total Parameters: 425,026 (1.7 MB) — 98.3% parameter reduction vs MLP!
 ```
 
-### Key design choices
-| Choice | Reason |
-|--------|--------|
-| BatchNorm after every conv | Stabilises gradients, allows higher LR, reduces sensitivity to weight init |
-| GlobalAvgPool instead of Flatten | Fewer parameters, less overfitting, spatially invariant |
-| Dropout(0.4) | Regularisation — prevents co-adaptation of neurons |
-| CosineAnnealingLR | Avoids getting stuck at a fixed LR; allows refined optimisation at the end |
-| Label smoothing (ε=0.1) | Prevents overconfidence, improves calibration |
-
-### Key equations
-
-**Conv output size:**
-$$H_{out} = \left\lfloor \frac{H_{in} + 2p - k}{s} \right\rfloor + 1$$
-With $k=3, p=1, s=1$: $H_{out} = H_{in}$ (same padding). MaxPool halves: $H_{out} = H_{in}/2$.
-
-**BatchNorm forward (at training):**
-$$\hat{x}_i = \frac{x_i - \mu_B}{\sqrt{\sigma_B^2 + \varepsilon}}, \quad y_i = \gamma \hat{x}_i + \beta$$
-
-**Label-smoothed cross-entropy:**
-$$\mathcal{L}_{LS} = -(1-\varepsilon)\log\hat{p}_{true} - \frac{\varepsilon}{K}\sum_c \log\hat{p}_c$$
-
-### Ablation results
-
-| Variant | Val F1 | Note |
-|---------|--------|------|
-| Full model (BN + Dropout + Aug) | — | From actual run |
-| No augmentation | — | Overfits faster |
-| No BatchNorm | — | Unstable training |
-| No Dropout | — | Val accuracy diverges from train |
-
-*(Fill from results/metrics/ after training)*
+### Ablation Study Results (103 Test Images)
+| Configuration | Test Accuracy | Macro F1 | ROC-AUC | Impact |
+|---|:---:|:---:|:---:|---|
+| **Full Custom CNN** | **92.23%** | **0.9223** | **0.9868** | **Best generalization** |
+| No Augmentation | 86.41% | 0.8637 | 0.9438 | -5.86% F1 drop; severe overfitting |
+| No BatchNorm | 88.35% | 0.8833 | 0.9453 | -3.90% F1 drop; slower convergence |
+| No Dropout | 92.23% | 0.9223 | 0.9872 | Wider train-val loss gap |
 
 ### Viva Q&A
 
-**Q1: Why does BatchNorm help training?**
-> Without BN, the distribution of each layer's input shifts as the weights update ("internal covariate shift"). BN normalises each mini-batch's activations to zero mean and unit variance, keeping distributions stable. This allows higher learning rates and faster convergence.
+**Q1: What is Global Average Pooling (GAP) and why is it superior to flattening?**
+> GAP computes the mean of each feature map: $(B, C, H, W) \to (B, C)$. Flattening yields $256 \times 8 \times 8 = 16,384$ features requiring millions of dense weights. GAP reduces features to 256, eliminates 95% of classifier parameters, acts as a structural regularizer, and makes the model spatially invariant.
 
-**Q2: What is Global Average Pooling and why use it over flattening?**
-> GAP computes the average of each feature map across all spatial positions: $(B, C, H, W) \to (B, C)$. Compared to flattening ($(B, C \cdot H \cdot W)$), GAP has dramatically fewer parameters going into the classifier, reducing overfitting. It also makes the model more spatially invariant.
+**Q2: Why does Batch Normalization accelerate training?**
+> BN normalizes each layer's activations across the batch to zero mean and unit variance. This reduces internal covariate shift, smooths the optimization landscape, enables higher learning rates, and provides a mild regularizing effect.
 
-**Q3: Explain the overfit sanity check and what it proves.**
-> We train on a tiny subset (50 images) for 20 epochs. The model should reach ~100% training accuracy on this tiny set. If it can't, the model is broken (vanishing gradients, wrong loss, etc.). If it can, we know the model has enough capacity — the challenge is generalisation on the full set.
+**Q3: Explain the overfit sanity check and why it is critical.**
+> We train the network on a tiny 50-image subset for 20 epochs without regularization. The model should rapidly reach ~100% training accuracy. If it cannot, the architecture is fundamentally broken (e.g., gradient vanishing, wrong loss). Passing the check proves the model has sufficient representational capacity.
 
-**Q4: What is CosineAnnealingLR and why is it better than StepLR?**
-> CosineAnnealingLR decays the learning rate following a cosine curve from $lr_{max}$ to 0 (or $lr_{min}$) over T_max epochs. StepLR drops LR by a fixed factor at fixed intervals (harsh, discontinuous). Cosine annealing is smoother, allows the model to escape local minima early (high LR) and converge precisely at the end (low LR).
+**Q4: What is CosineAnnealingLR and why use it over StepLR?**
+> Cosine annealing smoothly decays the learning rate following a half-cosine curve: $\eta_t = \eta_{\min} + \frac{1}{2}(\eta_{\max} - \eta_{\min})(1 + \cos(\pi t / T_{\max}))$. Unlike StepLR, which creates sudden loss spikes, cosine annealing allows high exploration early and smooth convergence late.
 
-**Q5: What does the Dropout layer actually do at train vs test time?**
-> At train time, each neuron is independently zeroed with probability $p$, and surviving activations are scaled by $1/(1-p)$. At test time, Dropout is disabled (all neurons active, no scaling needed since training compensated). This forces the network to not rely on any single neuron, acting as an ensemble of exponentially many sub-networks.
+**Q5: What are the statistical limits of the ablation conclusions?**
+> With a 103-image test split, small metric differences (such as Full CNN vs No Dropout at 92.23%) fall within the bootstrap margin of error. While data augmentation and BatchNorm show clear empirical improvements, fine-grained ablation differences must be interpreted with scientific modesty.
 
 ---
 
 ## M4 — Transfer Learning (MobileNetV2)
 
 ### What was built
-`transfer.py` — MobileNetV2 with custom head; `train_transfer.py` — two-phase training.
+`transfer.py` — MobileNetV2 with custom head; `train_transfer.py` — two-phase fine-tuning.
 
-### Why MobileNetV2?
-MobileNetV2 uses inverted residuals and linear bottlenecks — designed to be efficient on mobile devices. Only ~3.4M parameters vs ResNet50's 25M. Pretrained on ImageNet (1.28M images), it has learned general visual features that transfer well.
+### Two-Phase Fine-Tuning Strategy
+| Phase | Frozen Layers | LR | Epochs | Val F1 | Purpose |
+|---|---|:---:|:---:|:---:|---|
+| **Phase 1** | Backbone entirely frozen | $1 \times 10^{-3}$ | 5 | 0.9705 | Train new head while protecting pretrained ImageNet features |
+| **Phase 2** | Last 3 InvertedResidual blocks unfrozen | $5 \times 10^{-5}$ | 6 | **0.9804** | Fine-tune high-level features for road surface damage |
 
-### Two-phase strategy
-| Phase | Frozen? | LR | Purpose |
-|-------|---------|-----|---------|
-| Phase 1 (8 epochs) | Backbone frozen | 0.001 | Train head only; backbone protected |
-| Phase 2 (10 epochs) | Last 3 blocks unfrozen | 0.00005 | Fine-tune features for road damage |
-
-### Key equations
-
-**Fine-tuning parameter count:**
-Let $P_{total}$ = total parameters, $P_{frozen}$ = frozen parameters.
-Only $P_{total} - P_{frozen}$ parameters receive gradients in Phase 1.
-
-**Why much lower LR in Phase 2?**
-If $lr$ is too high, the pre-trained feature weights change too fast → "catastrophic forgetting" of ImageNet features. Rule of thumb: Phase2 LR ≈ Phase1 LR / 10 to 20.
+### Performance on 103 Test Images
+- **Accuracy:** 98.06%
+- **Macro F1:** 0.9806
+- **ROC-AUC:** 0.9985
+- **95% Bootstrap F1 CI:** `[95.02%, 100.0%]`
 
 ### Viva Q&A
 
-**Q1: What is transfer learning and why does it work for road images?**
-> Transfer learning reuses a model trained on a large dataset (ImageNet) for a new task. It works because low-level CNN features (edges, textures, colour blobs) are domain-agnostic. A model that learned to detect wheels and road lines on ImageNet has already learned low-level features useful for detecting pothole textures.
+**Q1: What is transfer learning and why does it work for asphalt roads?**
+> Transfer learning adapts a model pretrained on a massive corpus (ImageNet, 1.28M images) to a downstream domain. It works because low-level convolutional filters (edges, textures, gradients, color transitions) are universal visual primitives that transfer directly to road surface cracks.
 
-**Q2: What is catastrophic forgetting?**
-> When a pre-trained model is fine-tuned with too high a learning rate, the new gradient updates overwrite the carefully learned pre-trained weights. The model "forgets" the general features it learned on ImageNet. Using a low LR in Phase 2 (0.00005) prevents this.
+**Q2: What is catastrophic forgetting and how do you prevent it?**
+> Catastrophic forgetting occurs when large gradient updates overwrite pretrained feature weights, erasing generic visual representations. We prevent it by: (1) completely freezing the backbone during Phase 1, and (2) using a learning rate 20× smaller ($5 \times 10^{-5}$) in Phase 2.
 
-**Q3: Why freeze the backbone in Phase 1?**
-> Phase 1 trains only the new classifier head (randomly initialised). If the backbone were also unfrozen, large gradients from the random head would corrupt the pre-trained backbone weights. Freezing protects the backbone until the head has learned reasonable initial weights.
+**Q3: Which layers do you unfreeze in Phase 2 and why?**
+> We unfreeze only the last 3 InvertedResidual blocks (blocks 16–18). Early layers capture generic edges and textures; later layers capture high-level semantic shapes. Unfreezing only the final blocks allows the network to adapt to road distress while keeping generic early filters intact.
 
-**Q4: Which layers do you unfreeze in Phase 2 and why the last ones?**
-> We unfreeze the last 3 InvertedResidual blocks of `features`. Later layers learn more task-specific features (wheels, road damage patterns) while earlier layers learn generic features (edges, colours). Unfreezing only the later layers adapts the task-specific features while preserving the generic ones.
+**Q4: How does MobileNetV2 achieve efficiency?**
+> Through **inverted residual bottlenecks** (narrow $\to$ wide $\to$ narrow) and **depthwise separable convolutions** (splitting standard convolution into spatial depthwise filtering and $1\times 1$ pointwise channel projection). This reduces FLOPs by 8–9× compared to standard convolutions with minimal accuracy loss.
 
-**Q5: How does MobileNetV2 achieve efficiency with inverted residuals?**
-> Standard residual blocks: wide → narrow → wide. MobileNetV2 inverts this: narrow → wide → narrow (inverted residual). The wide intermediate layer allows for expressiveness, while the narrow endpoints reduce memory and computation. Depthwise separable convolutions replace standard convolutions, further reducing FLOPs by ~8–9×.
+**Q5: What does the 95% bootstrap confidence interval tell you about MobileNetV2 vs Custom CNN?**
+> MobileNetV2 achieves a mean test F1 of 98.06% with CI `[95.02%, 100.0%]`, while Custom CNN achieves 92.23% with CI `[86.77%, 97.08%]`. While MobileNetV2 shows superior point metrics, their confidence intervals slightly overlap, meaning we claim strong empirical superiority rather than absolute statistical proof on a 103-image test split.
 
 ---
 
-## M5 — Segmentation (U-Net)
+## YOLOv8n — Real-Time Object Detection (Images & Video)
 
 ### What was built
-`unet.py` — lightweight U-Net; `train_unet.py` — training with Dice+BCE loss + severity.
+`prepare_yolo_dataset.py`, `train_yolo.py`, `notebooks/train_yolo_colab.ipynb`; fine-tuned YOLOv8n on 1,590 deduplicated images (5,684 bounding boxes).
 
-### Architecture
-```
-Encoder:
-  DoubleConv(3→32)   → MaxPool → (B, 32,  64, 64)
-  DoubleConv(32→64)  → MaxPool → (B, 64,  32, 32)
-  DoubleConv(64→128) → MaxPool → (B, 128, 16, 16)
-Bottleneck:
-  DoubleConv(128→256)          → (B, 256, 16, 16)
-Decoder (with skip connections):
-  Upsample+DoubleConv(256+128→128) → (B, 128, 32, 32)
-  Upsample+DoubleConv(128+64→64)   → (B,  64, 64, 64)
-  Upsample+DoubleConv(64+32→32)    → (B,  32,128,128)
-Output: Conv(32→1) → Sigmoid → (B, 1, 128, 128)
-```
+### Test Set Performance (239 Held-Out Images, 887 Instances)
+- **Precision (P):** 71.46%
+- **Recall (R):** 55.34%
+- **mAP @ 0.50:** 61.49%
+- **mAP @ 0.50:0.95:** 36.18%
+- **Inference Latency:** 18.0 ms / frame (~55 FPS on CPU)
+- **Checkpoint Footprint:** 6.47 MB (`best.pt`)
 
 ### Key equations
+**CIoU Loss (Complete Intersection over Union):**
+$$\mathcal{L}_{\text{CIoU}} = 1 - \text{IoU} + \frac{\rho^2(\mathbf{b}, \mathbf{b}^{gt})}{c^2} + \alpha v$$
+where $\rho$ is Euclidean distance between box centers, $c$ is diagonal length of the smallest enclosing box, and $v$ measures aspect ratio consistency:
+$$v = \frac{4}{\pi^2} \left( \arctan\frac{w^{gt}}{h^{gt}} - \arctan\frac{w}{h} \right)^2, \quad \alpha = \frac{v}{(1 - \text{IoU}) + v}$$
 
-**Dice Loss:**
-$$\mathcal{L}_{Dice} = 1 - \frac{2 \sum_i p_i g_i + \varepsilon}{\sum_i p_i + \sum_i g_i + \varepsilon}$$
-where $p_i \in [0,1]$ is the predicted probability and $g_i \in \{0,1\}$ is the ground truth.
-
-**Combined Loss:**
-$$\mathcal{L} = w_{Dice} \cdot \mathcal{L}_{Dice} + (1 - w_{Dice}) \cdot \mathcal{L}_{BCE}$$
-
-**Severity (heuristic thresholds):**
-$$\text{ratio} = \frac{\text{pothole pixels}}{H \times W}, \quad \text{severity} = \begin{cases} \text{Low} & r < 0.05 \\ \text{Medium} & 0.05 \le r < 0.20 \\ \text{High} & r \ge 0.20 \end{cases}$$
-
-### Limitation
-> Masks are **rectangular approximations** generated from YOLO bounding boxes. No pixel-level annotation was available in the dataset. This is documented explicitly in the README and UI. IoU and Dice scores reflect this rectangular mask quality, not true pixel-level segmentation quality.
+**Mean Average Precision (mAP):**
+$$\text{AP} = \int_0^1 p(r) \, dr, \quad \text{mAP} = \frac{1}{C} \sum_{c=1}^C \text{AP}_c$$
 
 ### Viva Q&A
 
-**Q1: What are skip connections in U-Net and why are they important?**
-> Skip connections copy feature maps from each encoder stage directly to the corresponding decoder stage (concatenated). Without them, the decoder must reconstruct fine spatial detail from a compressed bottleneck alone. Skip connections preserve high-resolution spatial information (edges, boundaries) that gets lost during downsampling.
+**Q1: Why did you transition from U-Net to YOLOv8n?**
+> The dataset provided bounding-box coordinates, not pixel-level polygon masks. Training a U-Net on rasterized rectangular masks caused it to memorize rectangular bounding priors rather than true pothole morphology (Dice was artificially inflated to 0.9051). YOLOv8n is mathematically formulated for bounding-box supervision and predicts multi-instance locations, counts, and confidence scores.
 
-**Q2: Why use Dice loss instead of plain cross-entropy for segmentation?**
-> BCE treats every pixel equally. If 95% of pixels are background, a model predicting "all background" gets 95% accuracy but Dice ≈ 0. Dice loss directly measures overlap between prediction and ground truth, so it cares about minority-class (pothole) pixels. We use BCE+Dice because BCE provides stable gradients while Dice drives overlap maximisation.
+**Q2: What is the difference between anchor-based and anchor-free detection?**
+> Traditional detectors (YOLOv3, Faster R-CNN) predefine anchor boxes of fixed aspect ratios and predict offsets. YOLOv8 is anchor-free: it directly predicts the distance from the grid cell center to the 4 box boundaries ($l, r, t, b$) using Distribution Focal Loss. This eliminates manual anchor tuning and handles irregular pothole shapes better.
 
-**Q3: What is the difference between IoU and Dice?**
-> Both measure overlap between predicted and true masks.
-> - $\text{IoU} = |P \cap G| / |P \cup G|$
-> - $\text{Dice} = 2|P \cap G| / (|P| + |G|)$
-> Dice = 2·IoU / (1 + IoU). Dice is more sensitive to small overlaps and penalises false positives/negatives more aggressively. IoU is the standard metric in detection (COCO, PASCAL VOC).
+**Q3: Explain mAP@0.5 vs mAP@0.5:0.95.**
+> mAP@0.5 measures Average Precision at a 50% IoU overlap threshold between prediction and ground truth (PASCAL VOC benchmark). mAP@0.5:0.95 averages AP across 10 IoU thresholds from 0.50 to 0.95 in 0.05 increments (COCO benchmark). It heavily penalizes sloppy box boundaries. Our model achieves 61.49% mAP@0.5 and 36.18% mAP@0.5:0.95.
 
-**Q4: Why are the severity thresholds "heuristics"?**
-> There is no ground-truth severity label in the dataset. The thresholds (Low < 5%, Medium 5–20%, High > 20%) are based on engineering intuition about road repair urgency. A pothole covering >20% of the image is clearly severe; <5% is minor. These should be validated against expert road engineer judgements in a real deployment.
+**Q4: How does Non-Maximum Suppression (NMS) work during inference?**
+> Multiple grid cells can detect the same pothole. NMS sorts all candidate boxes by confidence, selects the highest-scoring box, and suppresses all other overlapping boxes whose IoU exceeds the NMS threshold (e.g. 0.45). This leaves exactly one bounding box per physical pothole.
 
-**Q5: What would you do with real pixel-level masks?**
-> Replace bounding-box-to-mask conversion with actual annotated masks. This would give higher IoU (not limited by rectangular approximation), enable shape-aware severity (not just area), and allow the U-Net to learn non-rectangular pothole shapes (potholes are often irregular polygons). Tools like CVAT or Roboflow could be used for annotation.
+**Q5: How does your video detection pipeline work?**
+> Frames are decoded sequentially via OpenCV `VideoCapture`. Each frame is resized to $416 \times 416$ and evaluated by YOLOv8n. Bounding boxes are filtered by confidence and drawn with severity color coding. Processed frames are re-encoded to H.264 MP4 using `imageio` with `libx264` for browser playback, operating at ~55 FPS.
 
 ---
 
 ## M6 — Explainability (Grad-CAM)
 
 ### What was built
-`gradcam.py` — manual Grad-CAM implementation; `run_gradcam.py` — gallery generation + failure analysis.
+In-house manual Grad-CAM implementation (`src/explainability/gradcam.py`) without third-party black-box libraries; failure gallery generation.
 
-### How Grad-CAM works (step by step)
-1. **Forward pass**: record activation maps $A^k$ at the target layer.
-2. **Backward pass** for target class $c$: compute $\frac{\partial y^c}{\partial A^k_{ij}}$.
-3. **Importance weights**: $\alpha^k_c = \text{GlobalAvgPool}\left(\frac{\partial y^c}{\partial A^k}\right)$ (one scalar per channel).
-4. **Weighted combination**: $L^c = \text{ReLU}\left(\sum_k \alpha^k_c A^k\right)$ — ReLU keeps only positive influence.
-5. **Normalise** to $[0,1]$ and upsample to input resolution.
-
-### Key equation
-$$L^c_{Grad-CAM} = \text{ReLU}\!\left(\sum_k \underbrace{\frac{1}{Z}\sum_{i,j}\frac{\partial y^c}{\partial A^k_{ij}}}_{\alpha^k_c} \cdot A^k\right)$$
+### Mathematical Formulation
+$$\alpha_k^c = \frac{1}{Z} \sum_{i=1}^H \sum_{j=1}^W \frac{\partial y^c}{\partial A_{k, i, j}}, \quad L_{\text{Grad-CAM}}^c = \text{ReLU}\left( \sum_k \alpha_k^c A^k \right)$$
 
 ### Viva Q&A
 
-**Q1: What does the Grad-CAM heatmap tell you?**
-> It shows which spatial regions of the input image were most influential for the model's prediction. High activation (red/warm) = the model found something important there. For a correct pothole prediction, activations should concentrate on the damaged road area. For a failure case, they might highlight irrelevant regions (shadows, lane markings).
+**Q1: What does the Grad-CAM heatmap tell you, and what are its limitations?**
+> It visualizes which spatial regions contributed positively to the classifier's class score. Its critical limitation is **coarse spatial resolution**: because MobileNetV2's final feature map is $4 \times 4$, Grad-CAM reveals broad regions of interest but cannot delineate exact pothole boundaries.
 
-**Q2: Why use ReLU in Grad-CAM?**
-> Without ReLU, channels with negative weights would appear as blue/cold in the heatmap, meaning they suppressed the class score. We care only about what *supports* the prediction (positive influence). ReLU zeros out the suppressing channels, keeping only the contributing ones.
+**Q2: Why is the ReLU function mandatory in Grad-CAM?**
+> Channels with negative gradients suppress the class score (they are evidence *against* the pothole hypothesis). Applying ReLU discards negative contributions, isolating only visual evidence that actively supports the prediction.
 
 **Q3: Why target the LAST convolutional layer?**
-> Earlier layers capture low-level features (edges, textures) shared across classes. The last convolutional layer has the most class-discriminative features while still retaining spatial information (before the global pooling collapses spatial structure). It gives the best combination of class-specificity and spatial resolution.
+> Earlier convolutional layers capture generic edges and textures shared across all images. The final convolutional layer preserves the highest-level semantic representations while still retaining 2D spatial dimensions before global pooling.
 
-**Q4: What failure patterns did you observe in the Grad-CAM gallery?**
-> Common failure cases:
-> - **Shadows**: model activates on dark shadow regions, misclassifies as pothole.
-> - **Wet roads**: specular reflections cause false positives.
-> - **Manhole covers**: dark circular shapes confuse the model.
-> - **Patched potholes**: healed potholes with different texture may be misclassified.
+**Q4: What failure patterns did you observe in the failure gallery?**
+> 8 test misclassifications revealed two primary failure modes:
+> - **False Positives:** Tree shadows and dark asphalt sealant patches have sharp contrast gradients mimicking pothole edges.
+> - **False Negatives:** Shallow potholes and road glare wash out edge gradients, causing the network to miss low-contrast defects.
 
-**Q5: What is the difference between Grad-CAM, Grad-CAM++, and LIME?**
-> Grad-CAM: global average pool of gradients → one weight per channel. Grad-CAM++: uses second-order gradients for better localisation of multiple object instances. LIME: model-agnostic — fits a local linear approximation around each prediction. Grad-CAM requires a CNN and access to gradients; LIME works on any classifier.
+**Q5: How does Grad-CAM differ from Grad-CAM++ and Score-CAM?**
+> Grad-CAM uses first-order gradients weighted by global average pooling. Grad-CAM++ uses second- and third-order gradients to better capture multiple instances. Score-CAM is gradient-free, weighting activation maps by the model's confidence increase when passing the masked image forward.
 
 ---
 
-## M7 — Siamese Network
+## M7 — Metric Learning & Report Deduplication (Siamese Network)
 
 ### What was built
-`siamese.py` — SiameseNet + ContrastiveLoss; `train_siamese.py` — training + t-SNE.
+`siamese.py` — Siamese network with shared CNN backbone; `train_siamese.py` — Contrastive Loss training with t-SNE embedding visualization.
 
-### Architecture
-Shared encoder (CustomCNN backbone, no classifier) → Linear(256, 128) → L2 normalise → embedding.
-Both images share identical weights (the SAME nn.Module instance).
+### Contrastive Loss Formulation
+$$\mathcal{L}(e_1, e_2, y) = (1 - y) \frac{1}{2} d^2 + y \frac{1}{2} \max(0, m - d)^2$$
+where $d = \|e_1 - e_2\|_2$, $y = 0$ for identical potholes, $y = 1$ for different scenes, and margin $m = 1.0$.
 
-### Key equation — Contrastive Loss
+### Performance
+- **Pair Classification Accuracy:** 96.12%
+- **Mean Intra-Class Distance (Same Pothole):** 0.2210 (tightly clustered below threshold $d < 0.5$)
+- **Mean Inter-Class Distance (Different Scenes):** 1.1988 (separated beyond margin $m=1.0$)
 
-$$\mathcal{L}_{contrastive}(e_1, e_2, y) = (1-y)\,d^2 + y\,\max(0,\, m - d)^2$$
-
-where $d = \|e_1 - e_2\|_2$, $y=0$ for same pair, $y=1$ for different pair, $m$ = margin (1.0).
-
-**Intuition**: Same pairs → $d \to 0$; Different pairs → $d \to m$ (or beyond).
-
-### ⚠️ Limitation (must state in viva)
-> Positive pairs are **augmented views of the same image**, not real same-pothole-over-time photos. The model learns "are these from the same damage category?" not "is this the same pothole years later?" This is documented in the README, the code comments, and the metrics JSON.
+### ⚠️ Limitation (Mandatory Viva Disclosure)
+> Real-world multi-temporal road surveys (the same pothole photographed weeks apart) were unavailable. Positive pairs were synthesized via heavy photometric and spatial augmentations of the same image. The network learns invariant metric representations under affine transformations, but true temporal validation remains future work.
 
 ### Viva Q&A
 
-**Q1: What is the purpose of L2 normalising the embeddings?**
-> L2 normalisation maps embeddings to the surface of a unit hypersphere. All vectors have magnitude 1, so Euclidean distance in embedding space is bounded $[0, 2]$ and directly interpretable as angular similarity. This makes the contrastive margin ($m=1.0$) meaningful across all training examples.
+**Q1: Why apply L2 normalization to embeddings?**
+> L2 normalization projects all feature vectors onto the surface of a unit hypersphere ($\|e\|_2 = 1$). This bounds Euclidean distances to $[0, 2]$, ensuring the contrastive margin ($m=1.0$) applies uniformly across all training samples.
 
-**Q2: Why use weight sharing in the Siamese network?**
-> Weight sharing ensures that both branches apply *identical transformations* to their inputs. Without it, the two branches could learn different representations and the distance between them would be meaningless. Weight sharing is enforced by using the SAME nn.Module instance for both forward passes — PyTorch automatically shares gradients.
+**Q2: What is weight sharing and why is it essential?**
+> Both images pass through the exact same PyTorch `nn.Module` instance. This guarantees that identical feature extractors are applied to both inputs, ensuring distances reflect semantic differences rather than branch-specific transformations.
 
-**Q3: What is the contrastive loss margin and how do you choose it?**
-> The margin $m$ is the minimum desired distance between different-class pairs. Same pairs should have $d < m/2$ (threshold we use for pair accuracy), and different pairs should have $d \geq m$. We set $m=1.0$ which is a standard starting point; it can be tuned on the validation pair accuracy.
+**Q3: How does this help a municipal complaint portal?**
+> When a citizen uploads a pothole photo, its 128-dimensional embedding is compared via Euclidean distance against existing open tickets. If $d < 0.50$, it is flagged as a duplicate submission, merged with the existing ticket, and increments its repair urgency.
 
-**Q4: What does the t-SNE plot show and what should you see?**
-> t-SNE reduces the 128-dim embeddings to 2D for visualisation. If the network has learned a good embedding, normal and pothole points should form separate clusters. Overlap indicates the embeddings are not discriminative enough. Clear separation validates that the Siamese network has learned a meaningful metric.
+**Q4: What is the purpose of the contrastive margin $m$?**
+> Without the margin, the loss would attempt to push different-class pairs infinitely far apart, leading to gradient explosion. The margin establishes an equilibrium: once different pairs are at least distance $m$ apart, their loss becomes zero, focusing gradients on hard negative pairs.
 
-**Q5: How would you use this model in a real citizen-reporting app?**
-> When a new pothole report arrives with an image, compute its embedding. Compare with embeddings of all existing reports using cosine similarity or L2 distance. If distance < threshold, the new report likely refers to the same pothole → mark as duplicate and increment its repair priority. Otherwise, add as a new pothole record.
+**Q5: What does the t-SNE plot validate?**
+> t-SNE projects 128-dimensional embeddings to 2D. Clear cluster separation between normal road surfaces and pothole instances confirms that the metric space captures class-discriminative geometry.
 
 ---
 
-## M8 — Autoencoder Anomaly Detection
+## M8 & M5 — Negative Results Analysis (Academic Integrity)
 
-### What was built
-`autoencoder.py` — ConvAutoencoder; `train_autoencoder.py` — unsupervised training + ROC-AUC.
+### Negative Result 1: Discarded Pseudo-Mask U-Net
+- **What was attempted:** Training `SmallUNet` with BCE+Dice loss on rasterized bounding boxes.
+- **Why it failed:** Rasterized bounding boxes taught the U-Net to predict rectangular boxes. The 0.9051 Dice score was an artifact of box overlap.
+- **The fix:** Discarded U-Net; replaced with YOLOv8n object detection.
 
-### Architecture
-```
-Encoder: 4 × (Conv2d + BN + ReLU, stride=2)   128→64→32→16→8  channels:3→32→64→128→256
-         Flatten → Linear(16384, 64) = latent vector
-Decoder: Linear(64, 16384) → Reshape(256,8,8)
-         4 × (ConvTranspose2d + BN + ReLU, stride=2)  8→16→32→64→128  channels:256→128→64→32→3
-         Tanh output
-```
-
-### Key equations
-
-**Reconstruction loss (MSE):**
-$$\mathcal{L}_{recon} = \frac{1}{N} \sum_{i=1}^N (x_i - \hat{x}_i)^2$$
-
-**Anomaly score:**
-$$\text{score}(x) = \mathcal{L}_{recon}(x, \hat{x}) = \text{MSE}(x, \text{Decoder}(\text{Encoder}(x)))$$
-
-**Threshold selection:** Find $\tau^*$ on validation set:
-$$\tau^* = \arg\max_\tau F_1\!\left(\text{score}(x) > \tau,\; y\right)$$
-
-### Why this is unsupervised
-> No labels are used during training. The AE sees ONLY normal road images. At test time, potholes reconstruct poorly (high MSE) because the model has no "template" for them. This models the intuition: "if I can't reconstruct it well, it's unusual."
+### Negative Result 2: Failed ConvAutoencoder Anomaly Detection
+- **What was attempted:** Training an unsupervised Autoencoder on normal roads to flag potholes via reconstruction MSE.
+- **The result:** Test ROC-AUC of **0.3008** (substantially worse than random guessing).
+- **Why it failed:** Natural road surfaces have high-frequency aggregate textures, shadows, and lane paint that produce higher reconstruction errors than dark, smooth pothole cavities. Generative reconstruction is unsuited for unconstrained outdoor textures.
 
 ### Viva Q&A
 
-**Q1: Why train the autoencoder ONLY on normal images?**
-> If the AE sees potholes during training, it learns to reconstruct them too → low MSE for potholes → they don't look anomalous. By training only on normal images, the model's reconstruction manifold covers only normal road textures. Potholes fall outside this manifold → high reconstruction error.
+**Q1: Why report an Autoencoder with an AUC of 0.3008?**
+> Scientific integrity requires reporting negative results. It demonstrates why unsupervised generative anomaly detection fails on high-variance outdoor imagery, justifying why supervised discriminative models (YOLO and MobileNetV2) are necessary.
 
-**Q2: What is ROC-AUC and why is it the right metric here?**
-> ROC-AUC measures the classifier's ability to rank positive examples higher than negatives, regardless of threshold. For anomaly detection, the threshold is a hyper-parameter — ROC-AUC is threshold-independent and tells us how well the anomaly score separates the two classes. AUC=0.5 is random, AUC=1.0 is perfect.
+**Q2: Why was Dice 0.9051 on U-Net misleading?**
+> Dice measures pixel overlap. When ground truth is a rectangle, a model predicting rectangles achieves high Dice without actually delineating irregular pothole boundaries.
 
-**Q3: How do you select the threshold?**
-> We try 50 linearly-spaced threshold values between the minimum and maximum validation anomaly scores. For each, we compute the F1 score (treating pothole as the positive class). The threshold with the highest val F1 is selected. This threshold is then fixed and used on the test set (which we look at only once).
-
-**Q4: Compare the AE anomaly detector vs the supervised CNN classifier.**
-> Supervised CNN: needs labelled data, discriminative, typically higher accuracy. AE anomaly detector: needs only normal-class data for training, can detect novel anomalies (new types of damage), but typically lower accuracy because it doesn't learn the discriminative boundary directly. The two complement each other: use the CNN for classification, use the AE to catch unusual inputs the CNN may not have been trained for.
-
-**Q5: What are the limitations of MSE as a reconstruction loss?**
-> MSE penalises pixel-wise differences equally, regardless of perceptual importance. A sharp edge vs. a blurry edge might have the same MSE but look very different. Also, MSE tends to produce blurry reconstructions (average over many plausible reconstructions). Alternatives: perceptual loss (VGG features), SSIM, or VAE with a probabilistic formulation.
+**Q3: Can your system measure pothole depth?**
+> No. A single monocular RGB camera cannot recover metric 3D depth without calibrated stereo pairs or LiDAR. Our severity metric is an explicit 2D surface area heuristic ($A_{\text{box}} / A_{\text{img}}$).
 
 ---
 
-## M10 — Streamlit App
+## M10 — Streamlit Deployment Architecture
 
-### What was built
-`app/app.py` — 4-tab UI: Classifier, Segmentation, Grad-CAM, Anomaly.
-
-### Key design choices
-| Choice | Reason |
-|--------|--------|
-| `@st.cache_resource` for model loading | Models loaded once per session, not on every re-render |
-| Fallback: transfer → CNN → baseline | App degrades gracefully if newer models aren't trained yet |
-| Inline Grad-CAM | No separate process; runs in real-time on uploaded image |
-| Threshold from config.yaml | AE threshold set once after training, persisted in config |
+### Architecture Overview
+The production dashboard is organized into 6 interactive tabs:
+1. **📸 Detect (Image):** Real-time YOLOv8n object detection, confidence slider, severity heuristic, side-by-side original vs annotated views, and structured results table.
+2. **🎥 Detect (Video):** Video inference engine capping clips to 15 seconds, rendering live detections, FPS throughput, and H.264 browser playback via `imageio`.
+3. **🔬 Classifier & Grad-CAM:** Binary classification with coarse activation heatmaps and explicit explainability notices.
+4. **📊 Experiments & Benchmarks:** Complete model comparison tables, ablation metrics, PR curves, and prediction galleries.
+5. **⚠️ Negative Results & Viva:** Post-mortems of U-Net and Autoencoder failures with 3 essential viva defense Q&As.
+6. **🗺️ Road Hazard Map:** Interactive municipal telemetry demo using `st.map`.
 
 ### Viva Q&A
 
-**Q1: What is `st.cache_resource` and why do you use it?**
-> `st.cache_resource` caches Python objects (like loaded model weights) across Streamlit re-renders. Without it, the model would reload from disk on every user interaction (button click, file upload). With it, models load once and are reused.
+**Q1: Why use `@st.cache_resource` for model loading?**
+> Streamlit re-executes the entire script on every user interaction (e.g. slider adjustment). `@st.cache_resource` ensures heavy PyTorch and YOLO weights are loaded into memory exactly once and reused, preventing memory leaks and multi-second UI freezes.
 
-**Q2: How does the Grad-CAM work in the app?**
-> On each image upload, we do a forward pass through the classifier, then run backward for the predicted class, extract gradients and activations from the last conv layer, compute weighted sum (Grad-CAM), resize to 128×128, apply jet colormap, and blend with the original image at 50% opacity.
+**Q2: How do you ensure generated video plays in all browsers?**
+> Standard OpenCV `mp4v` produces MPEG-4 Part 2, which modern browsers cannot play in HTML5 `<video>` tags. We use `imageio` with the `libx264` codec, which produces genuine H.264 encoded MP4 files supported across all desktop and mobile browsers.
 
-**Q3: What happens if no model checkpoint exists?**
-> The app shows a `st.warning` message in the affected tab (e.g., "No U-Net checkpoint found. Run train_unet.py first."). Other tabs continue to function normally. This graceful degradation prevents one missing checkpoint from breaking the entire app.
+**Q3: How is video length capped for interactive preview?**
+> Video processing inspects `cv2.CAP_PROP_FPS` and caps execution at $\min(\text{total\_frames}, \text{fps} \times 15)$, ensuring video inference completes in under 15 seconds on CPU.
 
-**Q4: Why use OpenCV for the mask overlay instead of PIL?**
-> `cv2.addWeighted` performs alpha blending efficiently in one call. PIL's approach would require manual array manipulation. OpenCV also provides `cv2.applyColorMap` which applies the jet colormap needed for Grad-CAM visualisation in a single function call.
+**Q4: What heuristic is used for pothole severity?**
+> Bounding box area divided by total image area: Low $< 2\%$, Medium $2\%-8\%$, High $> 8\%$. This provides an immediate triage signal for road maintenance dispatch.
 
-**Q5: What improvements would you make with more time?**
-> (1) Add a file upload to the Siamese tab to compare two uploaded images. (2) Add batch processing. (3) Deploy on Streamlit Cloud for a public demo URL. (4) Add GPS metadata display if images contain EXIF location data. (5) Add a severity trend chart from M9 LSTM (if implemented).
+**Q5: What are the primary future engineering extensions?**
+> (1) Stereo camera calibration for true metric depth/volume measurement, (2) Edge deployment with INT8 quantization, and (3) Municipal GPS telemetry integration with automated work-order generation.

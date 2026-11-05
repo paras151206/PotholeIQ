@@ -1,0 +1,11 @@
+{
+  "model": "YOLOv8n",
+  "dataset": "Kaggle Potholes Detection YOLO (1590 images, 5684 boxes)",
+  "test_split_size": 239,
+  "imgsz": 416,
+  "epochs": 8,
+  "precision": 0.7146,
+  "recall": 0.5534,
+  "map_50": 0.6149,
+  "map_50_95": 0.3618
+}

@@ -1,36 +1,38 @@
-# PotholeIQ — From Pothole Detection to a Repair Decision
+# PotholeIQ — Autonomous Road Hazard Detection & Infrastructure Assessment
 
 > **University Deep Learning Course Project**  
 > **Student:** Paras Panchal | **Degree:** B.Tech CSE (AI/ML)  
-> **Framework:** PyTorch 2.15+ · **Language:** Python 3.12+ · **Hardware:** CPU execution  
+> **Frameworks:** PyTorch 2.15+ · Ultralytics YOLOv8 · Python 3.12+ · **Execution:** Multi-core CPU & Colab GPU Notebook  
 > **GitHub Repository:** [https://github.com/paras151206/PotholeIQ](https://github.com/paras151206/PotholeIQ)
 
 ---
 
 ## Table of Contents
-1. [Problem Statement](#1-problem-statement)
+1. [Problem Statement & Evolution](#1-problem-statement--evolution)
 2. [End-to-End Pipeline Architecture](#2-end-to-end-pipeline-architecture)
-3. [Dataset & Data Card](#3-dataset--data-card)
+3. [Datasets & Data Cards](#3-datasets--data-cards)
 4. [Syllabus-to-Module Alignment](#4-syllabus-to-module-alignment)
 5. [Universal Machine Learning Workflow](#5-universal-machine-learning-workflow)
 6. [Comprehensive Experimental Results](#6-comprehensive-experimental-results)
 7. [Statistical Analysis & 95% Bootstrap CIs](#7-statistical-analysis--95-bootstrap-cis)
 8. [Explainability & Failure Analysis (Grad-CAM)](#8-explainability--failure-analysis-grad-cam)
-9. [How to Run the Application & Smoke Tests](#9-how-to-run-the-application--smoke-tests)
-10. [Honest Limitations & Future Work](#10-honest-limitations--future-work)
+9. [Negative Results & Scientific Integrity](#9-negative-results--scientific-integrity)
+10. [How to Run the Application & Smoke Tests](#10-how-to-run-the-application--smoke-tests)
+11. [Honest Limitations & Future Work](#11-honest-limitations--future-work)
 
 ---
 
-## 1. Problem Statement
+## 1. Problem Statement & Evolution
 
-Road potholes are a major cause of road accidents, structural vehicle damage, and municipal maintenance bottlenecks. Conventional road surveys rely on manual human inspection or specialized vehicle sensor rigs that are costly and slow.
+Road potholes cause vehicle damage, traffic congestion, and severe accidents. Conventional municipal road inspections rely on manual surveys or costly LiDAR/sensor vans.
 
-**PotholeIQ** addresses this with an end-to-end multi-task deep learning system that takes an ordinary camera image of a road and delivers a complete repair decision pipeline:
-- **(a) Detection:** Binary decision whether a pothole is present (MLP vs Custom CNN vs MobileNetV2).
-- **(b) Localization & Severity:** Small U-Net predicting damage masks and categorizing repair urgency into Low, Medium, or High severity.
-- **(c) Explainability:** Transparent Grad-CAM saliency heatmaps pinpointing which surface textures drove the model's prediction.
-- **(d) Duplicate Report Merging:** Metric learning via a Siamese network to detect duplicate citizen submissions.
-- **(e) Unsupervised Anomaly Check:** Convolutional Autoencoder trained strictly on pristine roads to detect anomalies via reconstruction error.
+**PotholeIQ** provides an end-to-end computer vision pipeline tailored for road hazard localization, severity triage, and repair prioritization:
+- **(a) Object Detection (YOLOv8n):** Predicts precise 2D bounding boxes, confidence scores, and count of individual potholes on both static road photographs and driving video.
+- **(b) Severity Triage Heuristic:** Computes relative damage footprint (Bounding Box Area / Image Area: Low $<2\%$, Medium $2\%-8\%$, High $>8\%$).
+- **(c) Classifier Progression:** Evaluates binary classification across three generations: Baseline MLP $\to$ 4-Stage Custom CNN $\to$ Fine-Tuned MobileNetV2.
+- **(d) Explainability:** Interprets classifier activations with Grad-CAM saliency maps.
+- **(e) Metric Learning:** Siamese network exploring duplicate citizen complaint deduplication.
+- **(f) Transparent Negative Results:** Discards pseudomask U-Net segmentation and unsupervised autoencoder anomaly detection after empirical failure analysis.
 
 ---
 
@@ -38,82 +40,74 @@ Road potholes are a major cause of road accidents, structural vehicle damage, an
 
 ```mermaid
 flowchart TD
-    IMG["Input Road Image (128x128x3)"] --> CLF{"Primary Classifier\n(MobileNetV2 / CNN)"}
-    CLF -->|"Pothole (Prob >= 50%)"| SEG["Small U-Net\nSegmentation"]
-    CLF -->|"Normal Road"| NORMAL_OUT["Normal Road Output"]
-    CLF --> XAI["Grad-CAM\nExplainability Engine"]
+    INPUT["Road Input (Image or Video Stream)"] --> YOLO["Fine-Tuned YOLOv8n\nObject Detector (416x416)"]
+    INPUT --> CLF["MobileNetV2 / Custom CNN\nBinary Classifier (128x128)"]
     
-    SEG --> MASK["Predicted Damage Mask"]
-    MASK --> SEV["Severity Heuristic\nArea Ratio: Low / Med / High"]
+    YOLO --> BBOX["Bounding Boxes + Confidence Scores"]
+    BBOX --> COUNT["Pothole Count per Frame"]
+    BBOX --> SEV["Severity Heuristic\n(Box Area / Image Area)\nLow <2% · Med 2-8% · High >8%"]
     
-    IMG --> SIA["Siamese Network\n(128-d Embedding)"]
-    SIA --> DUP{"Euclidean Dist < 0.5?\nDuplicate Citizen Report"}
+    CLF --> PROBS["Pothole Probability\n(Normal vs Pothole)"]
+    CLF --> GCAM["Grad-CAM Saliency Engine\n(Coarse Attribution Map)"]
     
-    IMG --> AE["Convolutional Autoencoder\n(Unsupervised)"]
-    AE --> MSE["Reconstruction MSE"]
-    MSE --> ANOM{"MSE > 0.1798?\nSurface Anomaly"}
-    
-    CLF --> APP["Streamlit UI Dashboard"]
-    SEG --> APP
-    XAI --> APP
-    SEV --> APP
-    AE --> APP
+    COUNT --> DASH["Interactive Streamlit UI\n(Images, Video, Benchmarks, Map)"]
+    SEV --> DASH
+    PROBS --> DASH
+    GCAM --> DASH
 ```
 
 ---
 
-## 3. Dataset & Data Card
+## 3. Datasets & Data Cards
 
-Every reported metric is based on a real run on the publicly available Kaggle Pothole Detection dataset:
+All reported metrics come from verified public datasets partitioned with fixed random seeds (`seed=42`) and checked for zero duplicate leakage.
 
-| Attribute | Verified Value |
-|-----------|----------------|
-| **Dataset Name** | Kaggle Pothole Detection Dataset (`atulyakumar98/pothole-detection-dataset`) |
-| **Licence** | CC0: Public Domain |
-| **Total Images** | **681 real road images** |
-| **Class Distribution** | 329 Potholes (48.31%) / 352 Normal Road (51.69%) — naturally balanced |
-| **Data Partitioning** | 70% Train (476) / 15% Validation (102) / 15% Test (103) |
-| **Split Strategy** | Stratified split by label with fixed random seed (`42`) |
-| **Data Leakage Check** | Rigorously verified via full absolute path disjointness check (`split.py`) — **0 images leaked** |
-| **Annotations** | Image-level binary class folders. For segmentation, bounding-box priors are rasterized as weak masks. |
+### 3.1 YOLO Object Detection Dataset (Bounding Boxes)
+- **Source:** Kaggle Potholes Detection YOLOv8 (`anggadwisunarto/potholes-detection-yolov8`)
+- **Format:** High-resolution road imagery with normalized YOLO `.txt` bounding boxes (`class x_center y_center width height`).
+- **Cleaning:** MD5 file hash inspection removed **387 duplicate images** to eliminate train-test leakage.
+- **Split Distribution (70 / 15 / 15):**
 
-### Verified Split Sizes Table
-| Split | Total Images | Normal (Class 0) | Pothole (Class 1) | Pothole % |
-|-------|--------------|------------------|-------------------|-----------|
-| **Train** | 476 | 246 | 230 | 48.3% |
-| **Validation** | 102 | 53 | 49 | 48.0% |
-| **Test** | 103 | 53 | 50 | 48.5% |
-| **Total** | **681** | **352** | **329** | **48.3%** |
+| Split | Images | Ground-Truth Pothole Boxes | Avg Boxes / Image | Leakage Status |
+|---|:---:|:---:|:---:|:---:|
+| **Train** | 1,113 | 3,972 | 3.57 | **0 images leaked** |
+| **Validation** | 238 | 825 | 3.47 | **0 images leaked** |
+| **Test (Held-Out)** | 239 | 887 | 3.71 | **0 images leaked** |
+| **Total Unique** | **1,590** | **5,684** | **3.57** | **Zero overlap** |
+
+### 3.2 Classification Benchmark Dataset
+- **Source:** Kaggle Pothole Detection Dataset (`atulyakumar98/pothole-detection-dataset`)
+- **Total Images:** 681 real road images (329 Pothole / 352 Normal Road).
+- **Split Distribution:** 476 Train (70%) / 102 Validation (15%) / 103 Test (15%) — stratified with seed 42.
 
 ---
 
 ## 4. Syllabus-to-Module Alignment
 
-Every module in PotholeIQ maps directly to core university syllabus units:
+Every module connects course theory to practical code:
 
-| Syllabus Unit | Theoretical Concept | Project Module | Concrete Implementation |
-|---------------|---------------------|----------------|--------------------------|
-| **Unit I** | NN Maths, Hyperparams, ML Workflow | **M0, M1, M2** | `config.yaml`, Seed utils, Data Card, EDA, `TinyMLP` baseline |
+| Unit | Syllabus Concept | Module | Implementation |
+|---|---|---|---|
+| **Unit I** | NN Fundamentals & Hyperparameters | **M0, M1, M2** | `config.yaml`, Seed utilities, EDA, `TinyMLP` baseline |
 | **Unit II** | Custom CNN Architectures | **M3** | 4-block `CustomCNN`, BatchNorm, Dropout, GAP layer |
-| **Unit II** | Transfer Learning & Fine-Tuning | **M4** | Two-phase MobileNetV2 (frozen head -> unfreeze last 3 blocks) |
-| **Unit II** | Semantic Image Segmentation | **M5** | `SmallUNet` with skip-connections, combined BCE + Dice loss |
-| **Unit II** | Explainable AI (XAI) | **M6** | Exact formula manual Grad-CAM, failure mode study |
-| **Unit II** | Metric Learning / Siamese Nets | **M7** | `SiameseNet`, Contrastive loss, t-SNE embedding clusters |
-| **Unit V** | Unsupervised Anomaly Detection | **M8** | `ConvAutoencoder` trained on clean roads, MSE anomaly score |
-| **Unit II/UI**| Model Deployment & Serving | **M10** | Interactive 4-tab Streamlit application |
+| **Unit II** | Transfer Learning & Fine-Tuning | **M4** | Two-phase MobileNetV2 (frozen backbone $\to$ unfreeze top blocks) |
+| **Unit II** | Object Detection (Localization) | **YOLO** | Fine-tuned YOLOv8n detector for multi-pothole localization |
+| **Unit II** | Explainable AI (XAI) | **M6** | Exact formula manual Grad-CAM, failure gallery analysis |
+| **Unit II** | Metric Learning / Siamese Nets | **M7** | `SiameseNet`, Contrastive loss on paired submissions |
+| **Unit V** | Unsupervised Anomaly Detection | **M8** | `ConvAutoencoder` trained on clean roads (Negative result) |
+| **Deployment** | Serving & Interactive Dashboard | **M10** | Streamlit 6-tab app (Image, Video, Grad-CAM, Experiments, Negative Results, Map) |
 
 ---
 
 ## 5. Universal Machine Learning Workflow
 
-PotholeIQ strictly demonstrates the standard deep learning project lifecycle:
-1. **Problem Definition:** Binary classification with localized damage assessment and duplicate report matching under computational constraints.
-2. **Data Curation & Leakage Prevention:** Stratified 70/15/15 split saved as fixed CSVs, verified for 0 leakage across splits.
-3. **Establish Baseline:** TinyMLP baseline trained on flattened raw pixels ($3 \times 128 \times 128 = 49,152$ inputs) achieving 72.82% accuracy.
-4. **Overfit Sanity Check:** Custom CNN trained on a tiny 50-image subset without regularization, verifying 92.0% memorization capacity in 20 epochs.
-5. **Regularization & Architectural Tuning:** Data augmentation (flips, rotation, color jitter, random erasing), BatchNorm, and Dropout.
-6. **Transfer Learning:** Pretrained MobileNetV2 achieving 98.06% test accuracy.
-7. **Held-out Test Evaluation:** Evaluated on the 103-image test set exactly **once** using best validation loss checkpoints.
+1. **Problem Definition:** Moving from single-label image classification to spatial bounding-box damage localization and video tracking.
+2. **Data Curation & De-duplication:** Strict MD5 deduplication removing 387 duplicates before a stratified 70/15/15 split.
+3. **Establishing Baselines:** Flattened pixel MLP baseline (72.82% accuracy).
+4. **Iterative Model Scaling:** Custom CNN (92.23%) $\to$ Pretrained MobileNetV2 (98.06%) $\to$ YOLOv8n detector (mAP@0.5: 61.49%).
+5. **Ablation Experiments:** Isolating the impact of data augmentation, batch normalization, and dropout.
+6. **Strict Held-Out Evaluation:** Every model evaluated on its designated test split exactly once using best-checkpoint weights.
+7. **Transparent Reporting:** Documenting negative results where theory failed in practice (U-Net pseudo-masks and Autoencoder texture reconstruction).
 
 ---
 
@@ -121,78 +115,43 @@ PotholeIQ strictly demonstrates the standard deep learning project lifecycle:
 
 *All figures are directly traceable to raw logs and metric JSON files in `results/metrics/`.*
 
-### 6.1 Primary Classifier Progression
+### 6.1 YOLOv8n Object Detection Performance (Held-Out Test Split)
 
-| Model | Test Accuracy | Precision (Macro) | Recall (Macro) | Test F1 | Test ROC-AUC | Checkpoint Size |
+Evaluated strictly on the **239 held-out test images** (887 ground-truth pothole instances):
+
+| Metric | Test Set Score | Interpretation |
+|---|:---:|---|
+| **Precision (P)** | **71.46%** | High fidelity; low false-positive rate on background asphalt textures |
+| **Recall (R)** | **55.34%** | Successfully catches over half of all visible potholes; misses small/shallow craters |
+| **mAP @ 0.50** | **61.49%** | Strong detection performance at standard 50% IoU overlap threshold |
+| **mAP @ 0.50:0.95** | **36.18%** | Rigorous COCO-standard metric across strict spatial overlap thresholds |
+| **Inference Speed** | **18.0 ms / frame** | Real-time capability on standard CPU (~55 FPS) |
+| **Model Footprint** | **6.47 MB (`best.pt`)** | Ultra-lightweight deployment footprint (~3.13M parameters) |
+
+### 6.2 Primary Classifier Progression (103 Test Images)
+
+| Model | Test Accuracy | Macro Precision | Macro Recall | Macro F1 | ROC-AUC | Checkpoint Size |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **M2 Baseline MLP** | 72.82% | 0.7334 | 0.7257 | 0.7250 | 0.8502 | 100.9 MB |
 | **M3 Custom CNN** | 92.23% | 0.9225 | 0.9228 | 0.9223 | 0.9868 | 1.7 MB |
-| **M4 MobileNetV2 (Fine-tuned)** | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** | 10.5 MB |
+| **M4 MobileNetV2 (Transfer)** | **98.06%** | **0.9806** | **0.9806** | **0.9806** | **0.9985** | 10.5 MB |
 
-> **Key Viva Insight:** The Custom CNN reduces parameter count by **98.3%** compared to the naive MLP ($25.2\text{M} \to 425\text{K}$ parameters) while boosting test accuracy by **+19.41%** ($72.82\% \to 92.23\%$). This demonstrates the inductive bias of translation equivariance and local spatial weight sharing in convolutions. MobileNetV2 pushes this further to **98.06%** via rich ImageNet features.
+### 6.3 Custom CNN Ablation Study (Module M3)
 
----
+| Architecture Variant | Test Accuracy | Macro F1 | ROC-AUC | Impact Analysis |
+|---|:---:|:---:|:---:|---|
+| **Full Custom CNN** (Aug + BN + Drop) | **92.23%** | **0.9223** | **0.9868** | **Best balanced generalization** |
+| **Ablation 1: No Augmentation** | 86.41% | 0.8637 | 0.9438 | **-5.86% F1 drop**; overfits training road surfaces |
+| **Ablation 2: No BatchNorm** | 88.35% | 0.8833 | 0.9453 | **-3.90% F1 drop**; slower convergence, internal covariate shift |
+| **Ablation 3: No Dropout** | 92.23% | 0.9223 | 0.9872 | Comparable on test set, but wider generalization gap during training |
 
-### 6.2 Custom CNN Ablation Study (Module M3)
-
-To isolate the contribution of each design component, three ablations were trained under identical conditions:
-
-| Architecture Variant | Test Accuracy | Macro Precision | Macro Recall | Macro F1 | ROC-AUC | Impact Analysis |
-|---|:---:|:---:|:---:|:---:|:---:|---|
-| **Full Custom CNN** (Aug + BN + Drop) | **92.23%** | **0.9225** | **0.9228** | **0.9223** | **0.9868** | **Best balanced generalization** |
-| **Ablation 1: No Augmentation** | 86.41% | 0.8641 | 0.8645 | 0.8637 | 0.9438 | **-5.86% F1 drop**; severe train-val generalization gap |
-| **Ablation 2: No BatchNorm** | 88.35% | 0.8845 | 0.8828 | 0.8833 | 0.9453 | **-3.90% F1 drop**; slower convergence and internal covariate shift |
-| **Ablation 3: No Dropout** | 92.23% | 0.9240 | 0.9234 | 0.9223 | 0.9872 | Comparable on test set, but slightly wider gap during training |
-
----
-
-### 6.3 Two-Phase Fine-Tuning Progression (Module M4)
-
-| Training Phase | Description | Epochs | Validation Loss | Validation Accuracy | Validation F1 |
-|---|---|:---:|:---:|:---:|:---:|
-| **Phase 1: Feature Extraction** | MobileNetV2 backbone frozen; custom 2-layer head ($1280 \to 256 \to 2$) trained with Adam ($\text{lr}=10^{-3}$) | 5 | 0.0676 | 97.06% | 0.9705 |
-| **Phase 2: Partial Fine-Tuning** | Unfreezes last 3 InvertedResidual blocks ($1.53\text{M}$ trainable params) with lower LR ($\text{lr}=5 \times 10^{-5}$) | 6 | **0.0321** | **98.04%** | **0.9804** |
-
----
-
-### 6.4 Segmentation & Urgency Estimation (Module M5)
-
-Small U-Net segmentation trained with equal-weight compound loss ($\mathcal{L} = 0.5 \mathcal{L}_{\text{BCE}} + 0.5 \mathcal{L}_{\text{Dice}}$):
-
-| Metric | Score on 103 Held-Out Test Images | Notes |
-|---|:---:|---|
-| **Test Dice Coefficient** | **0.9051** | Harmonic mean of precision and recall over spatial damage mask |
-| **Test Intersection over Union (IoU)** | **0.8276** | Jaccard index between predicted and target masks |
-| **Test Severity Distribution** | Low: 42 (40.8%) · Medium: 15 (14.6%) · High: 46 (44.7%) | Computed via mask-to-image area ratio |
-
----
-
-### 6.5 Siamese Metric Learning (Module M7)
-
-Siamese network trained using Contrastive Loss ($\text{margin}=1.0$) to merge duplicate citizen reports:
-
-| Evaluation Metric | Value | Interpretation |
-|---|:---:|---|
-| **Pair Classification Accuracy** | **96.12%** | Correctly pairs identical potholes vs different images |
-| **Avg Euclidean Distance (Same-Pothole Pairs)** | **0.2210** | Clustered tightly (well below the $\text{margin}/2 = 0.5$ threshold) |
-| **Avg Euclidean Distance (Different Pairs)** | **1.1988** | Pushed beyond the contrastive margin ($\ge 1.0$) |
-| **Contrastive Test Loss** | **0.0258** | Stable embedding convergence |
-
----
-
-### 6.6 Supervised Classifier vs Unsupervised Autoencoder (Module M8)
-
-| Method | Paradigm | Primary Metric | Decision Boundary | Key Viva Distinction |
-|---|---|:---:|:---:|---|
-| **MobileNetV2** | Supervised | **F1 = 0.9806** (AUC: 0.9985) | Softmax probability $\ge 0.50$ | Requires labelled data; highly accurate within distribution |
-| **Custom CNN** | Supervised | **F1 = 0.9223** (AUC: 0.9868) | Softmax probability $\ge 0.50$ | Good feature extractor, lightweight |
-| **ConvAutoencoder** | Unsupervised | **F1 = 0.6536** (AUC: 0.3008) | Reconstruction $\text{MSE} \ge 0.1798$ | Trained **only on clean road**; sensitive to shadows and road texture shifts |
+*Note: While ablations show clear empirical separation, the modest 103-image test split means fine-grained differences (e.g. Dropout vs Full) carry overlapping bootstrap error margins.*
 
 ---
 
 ## 7. Statistical Analysis & 95% Bootstrap CIs
 
-To account for test set sample size ($N = 103$ images), we computed 95% non-parametric bootstrap confidence intervals over 1,000 resamplings with replacement (`bootstrap_ci_summary.json`):
+To avoid drawing overconfident conclusions from single point estimates on small test sets, non-parametric bootstrap confidence intervals (1,000 resamples with replacement) were calculated:
 
 | Model | Test Accuracy (Mean) | 95% Accuracy CI | Test Macro F1 (Mean) | 95% Macro F1 CI |
 |---|:---:|:---:|:---:|:---:|
@@ -200,66 +159,84 @@ To account for test set sample size ($N = 103$ images), we computed 95% non-para
 | **Custom CNN** | 92.29% | **[87.38%, 97.09%]** | 92.22% | **[86.77%, 97.08%]** |
 | **MobileNetV2** | 98.08% | **[95.15%, 100.0%]** | 98.06% | **[95.02%, 100.0%]** |
 
-> **Defensible Viva Point:** The 95% CI of the Custom CNN (`[86.77%, 97.08%]`) has **zero overlap** with the Baseline MLP (`[63.58%, 80.68%]`). This proves with $p < 0.05$ statistical significance that the convolutional feature hierarchy fundamentally outperforms the flattened MLP on road imagery. Furthermore, MobileNetV2's CI (`[95.02%, 100.0%]`) confirms strong performance, though the modest 103-image test size means the margin over Custom CNN should be interpreted with realistic humility.
+> **Viva Defense Insight:** The 95% CI of the Custom CNN (`[86.77%, 97.08%]`) and the Baseline MLP (`[63.58%, 80.68%]`) have **zero overlap**. This provides **strong empirical evidence** that convolutional parameter sharing and translation equivariance outperform flattened linear projections on road imagery. However, because the test set contains 103 images, differences between MobileNetV2 and CNN should be interpreted with realistic scientific modesty.
 
 ---
 
 ## 8. Explainability & Failure Analysis (Grad-CAM)
 
-We implemented Grad-CAM from scratch in `src/explainability/gradcam.py` without third-party black-box libraries.
-The class activation weight $\alpha_k^c$ is computed via spatial Global Average Pooling of gradients:
-$$\alpha_k^c = \frac{1}{Z} \sum_{i} \sum_{j} \frac{\partial y^c}{\partial A_{i,j}^k}$$
-$$L_{\text{Grad-CAM}}^c = \text{ReLU}\left(\sum_k \alpha_k^c A^k\right)$$
+Grad-CAM was implemented from scratch (`src/explainability/gradcam.py`) to extract feature attribution maps from final convolutional feature layers:
 
-### Failure Analysis Summary (`results/metrics/gradcam_failure_analysis.txt`)
-Out of 103 test samples, the Custom CNN misclassified exactly **8 images** (5 False Positives, 3 False Negatives):
-1. **False Positives (Normal classified as Pothole, $n=5$, avg conf = 75.2%):**
-   - High-contrast shadows from trees or roadside barriers create sharp dark boundaries.
-   - Asphalt tar patches and manhole covers exhibit similar dark, non-reflective textures that trigger pothole responses.
-2. **False Negatives (Pothole classified as Normal, $n=3$, avg conf = 57.3%):**
-   - Shallow or eroded potholes with smooth edge transitions lack high spatial frequency gradients.
-   - Wet roads with sun glare wash out edge contrast, causing diffuse activation across the entire road plane.
+$$\alpha_k^c = \frac{1}{Z} \sum_{i} \sum_{j} \frac{\partial y^c}{\partial A_{i,j}^k}, \quad L_{\text{Grad-CAM}}^c = \text{ReLU}\left(\sum_k \alpha_k^c A^k\right)$$
+
+> **Honest Explainability Note:** Grad-CAM produces a coarse activation map (e.g. $4 \times 4$ spatial resolution in MobileNetV2). It indicates broad asphalt regions influencing the binary classifier ("pothole present vs normal road"), but **does not isolate individual pothole boundaries**. Precise bounding box boundaries require dedicated object detectors like YOLOv8n.
+
+### Classifier Failure Analysis (`gradcam_failure_analysis.txt`):
+Out of 103 test images, the Custom CNN misclassified 8 images:
+1. **False Positives ($n=5$):** Sharp tree shadows and dark asphalt tar sealant patches mimicked pothole contrast.
+2. **False Negatives ($n=3$):** Shallow eroded potholes and wet road glare washed out edge gradients.
 
 ---
 
-## 9. How to Run the Application & Smoke Tests
+## 9. Negative Results & Scientific Integrity
 
-### 1. Environment Setup
+A core hallmark of genuine scientific work is transparently reporting experiments that failed:
+
+### 1. Discarded U-Net Pseudo-Mask Segmentation
+- **The Experiment:** A Small U-Net was trained to predict road damage masks.
+- **The Flaw:** Public datasets contained rectangular bounding boxes rather than true polygon segmentation contours. When rasterized into binary masks, the U-Net learned to predict rectangular boxes (learning the bounding box prior).
+- **The Consequence:** The resulting high test Dice coefficient ($0.9051$) was mathematically artificial. The model was not doing true morphological segmentation.
+- **The Resolution:** The U-Net was discarded from the production inference pipeline and replaced with YOLOv8n, which is mathematically formulated for bounding boxes.
+
+### 2. Failed Autoencoder Anomaly Detection
+- **The Experiment:** A Convolutional Autoencoder was trained strictly on pristine normal road surfaces under the hypothesis that potholes would produce high reconstruction error.
+- **The Flaw:** On the held-out test set, the Autoencoder achieved an ROC-AUC of only **0.3008** (worse than random guessing).
+- **The Reason:** Pristine asphalt surfaces contain high-frequency gravel aggregates, surface markings, and variable outdoor lighting that yield higher reconstruction MSE than darker, smoother pothole basins. Unsupervised generative reconstruction failed on unconstrained outdoor textures.
+
+### 3. Synthetic Siamese Pairs
+- **The Experiment:** A Siamese Network with Contrastive Loss achieved 96.12% accuracy on paired images.
+- **The Caveat:** True temporal pairs (the same pothole captured weeks apart under different lighting) were unavailable in public datasets. Positive pairs were synthesized via heavy spatial and photometric augmentations of the same image.
+
+---
+
+## 10. How to Run the Application & Smoke Tests
+
+### 1. Installation
 ```bash
-# Clone the repository
 git clone https://github.com/paras151206/PotholeIQ.git
 cd PotholeIQ
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Run End-to-End Smoke Test
-Verify all 11 model components and utilities in under 20 seconds:
+### 2. Run Smoke Test Suite
+Verifies all 12 modules, loaders, loss functions, and detectors in ~15 seconds:
 ```bash
 python smoke_test.py
 ```
 
-### 3. Launch the Streamlit Interactive App
+### 3. Launch Interactive Streamlit Dashboard
 ```bash
-streamlit run app/app.py
+streamlit run app/app.py --server.port 8501 --server.headless true
 ```
-Upload any image from `data/raw/potholes/` or `data/raw/normal/` to view:
-- **Tab 1:** Binary classification verdict, probability gauge, and confidence score.
-- **Tab 2:** U-Net segmentation overlay, raw predicted mask, and severity tag (Low / Med / High).
-- **Tab 3:** Grad-CAM saliency heatmap identifying exact visual evidence.
-- **Tab 4:** Autoencoder reconstruction and anomaly MSE score comparison against threshold.
+Open **`http://localhost:8501`** in your browser.
+
+#### Dashboard Capabilities:
+- **Tab 1: Detect (Image):** Real-time YOLOv8n detection, confidence slider, per-box severity heuristic, side-by-side original vs annotated views, and structured results table.
+- **Tab 2: Detect (Video):** Upload or choose sample road driving video, process frames with live progress, view frame detections, and play back H.264 annotated video.
+- **Tab 3: Classifier & Grad-CAM:** Binary classification with coarse activation heatmaps and explainability disclaimers.
+- **Tab 4: Experiments & Benchmarks:** Interactive model comparison tables, ablation metrics, PR curves, and prediction galleries.
+- **Tab 5: Negative Results & Viva Analysis:** Discarded U-Net and Autoencoder post-mortems with 3 essential viva defense Q&As.
+- **Tab 6: Road Hazard Map:** Interactive geographic telemetry demo using `st.map`.
 
 ---
 
-## 10. Honest Limitations & Future Work
+## 11. Honest Limitations & Future Work
 
-In keeping with academic honesty standards for university defense:
-1. **Weak Segmentation Masks:** In the absence of pixel-level polygonal masks in the Kaggle dataset, bounding boxes and geometric priors were used as weak supervisory signals. True polygon annotations would further refine IoU on irregular boundaries.
-2. **Synthetic Siamese Pairs:** True temporal pairs of the exact same pothole taken months apart under changing weather were unavailable in public datasets. Positive pairs were formed via heavy photometric and spatial augmentations of the same physical instance.
-3. **Autoencoder Generalization:** The unsupervised convolutional autoencoder achieved an ROC-AUC of 0.3008. Real road images exhibit substantial background variation (vegetation, lighting, asphalt grain) that cause high reconstruction error even on normal roads, highlighting why supervised classifiers remain superior for unconstrained road damage classification.
-4. **Severity Thresholding:** Severity categories (Low < 5%, Medium 5–20%, High > 20%) are engineering heuristics based on relative damaged surface area, rather than geotechnical depth measurements.
+1. **Uncalibrated Monocular Camera:** A single 2D camera cannot measure metric pothole depth or volumetric cavity displacement. True geotechnical repair prioritization requires calibrated stereo cameras or LiDAR.
+2. **Heuristic Severity:** Severity ratings (Low $<2\%$, Medium $2\%-8\%$, High $>8\%$) represent 2D image surface area ratios, not structural road failure depth.
+3. **Lighting & Water Glare:** Wet roads with standing water reflect sunlight, occluding internal crater texture and degrading detector recall.
+4. **Video Inference Capping:** For interactive responsiveness on CPU, video previews are capped at 15 seconds.
 
 ---
 
-*Repository maintained and documented by Paras Panchal for university Deep Learning oral viva defense.*
+*Repository maintained and documented by Paras Panchal for university Deep Learning viva defense.*

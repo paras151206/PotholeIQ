@@ -27,6 +27,11 @@ PyYAML>=6.0
 tqdm>=4.65.0
 rich>=13.0.0                    # pretty console output
 
+# ── Object Detection & Video ─────────────────────────────────────────────────
+ultralytics>=8.1.0
+imageio>=2.30.0
+imageio-ffmpeg>=0.4.8
+
 # ── Explainability ───────────────────────────────────────────────────────────
 grad-cam>=1.4.8                 # pytorch-grad-cam package
 
